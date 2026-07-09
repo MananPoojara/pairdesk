@@ -39,7 +39,7 @@ function AddClientModal({ onClose, onSaved }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [codeManual, setCodeManual] = useState(false)
-  const [category, setCategory] = useState('HNI')
+  const [category, setCategory] = useState('Institution')
   const [joinedAt, setJoinedAt] = useState(today)
   // INR raw strings with commas for display
   const [aumInr, setAumInr] = useState('')

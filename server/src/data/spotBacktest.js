@@ -31,4 +31,5 @@ export const spotBacktest = [
   { date: '2026-03-01', net_inr: 26913694, midcap_net_inr: 48882454, nifty_net_inr: -21968760 },
   { date: '2026-04-01', net_inr: 12954052, midcap_net_inr: 11871652, nifty_net_inr: 1082400 },
   { date: '2026-05-01', net_inr: -2605412, midcap_net_inr: -3238352, nifty_net_inr: 632940 },
+  { date: '2026-06-01', net_inr: 1080177, midcap_net_inr: 2361237, nifty_net_inr: -1281060 },
 ]

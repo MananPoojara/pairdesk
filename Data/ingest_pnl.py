@@ -186,7 +186,7 @@ else:
 # Single real client — AUM ₹30 Cr (sheet: P&L 30 Cr)
 cur.execute("""
     INSERT INTO clients (code, name, category, aum_paise)
-    VALUES ('TEST', 'Test', 'Retail', 30_000_000_000)  -- ₹30 Cr
+    VALUES ('TEST', 'Test', 'Institution', 30_000_000_000)  -- ₹30 Cr
     ON CONFLICT (code) DO UPDATE
       SET name=EXCLUDED.name, category=EXCLUDED.category, aum_paise=EXCLUDED.aum_paise
     RETURNING id
@@ -202,7 +202,7 @@ cur.execute("""
     ON CONFLICT (client_id, strategy_id) DO NOTHING
 """, (client_id, strategy_id))
 
-print(f"  Seeded 1 client (Test / Retail / ₹30Cr) + strategy")
+print(f"  Seeded 1 client (Test / Institution / ₹30Cr) + strategy")
 
 # Insert trades (clear first so re-run is idempotent)
 cur.execute("DELETE FROM trade_charges")
