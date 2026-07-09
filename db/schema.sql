@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS clients (
   name          TEXT NOT NULL,
   category      TEXT NOT NULL CHECK (category IN ('Retail','HNI','Institution')),
   aum_paise     BIGINT NOT NULL DEFAULT 0,      -- money in paise (1 INR = 100 paise)
+  brokerage_pct NUMERIC(8,4) NOT NULL DEFAULT 0, -- per-client brokerage rate (%)
+  tax_pct       NUMERIC(8,4) NOT NULL DEFAULT 0, -- per-client tax rate (%)
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
