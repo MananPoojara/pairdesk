@@ -109,6 +109,13 @@ export default function Dashboard() {
     ? `${fmtDate(selectedMonthly[0]?.month || startDate)} → ${fmtDate(endDate)}`
     : '—'
   const activeRangeLabel = range === 'All' ? rangeDt : selectedRangeDt
+  // "showcasing <first month> – <last month>" derived from the data so it never goes stale.
+  const fmtMonYr = (m) => {
+    const dt = new Date(String(m || '').slice(0, 10) + 'T00:00:00Z')
+    return isNaN(dt) ? '' : dt.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+  }
+  const showcaseFrom = d.monthly?.length ? fmtMonYr(d.monthly[0].month) : ''
+  const showcaseTo   = d.monthly?.length ? fmtMonYr(d.monthly[d.monthly.length - 1].month) : ''
   const heroAmt = mode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
   const heroReal = mode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
   const heroSince = mode === 'overall'
@@ -183,7 +190,7 @@ export default function Dashboard() {
 
       <div className="shell">
         <div className="title">Pair Trading — Live Book</div>
-        <div className="crumb">Midcap × Nifty · latest trading day {fmtDate(d.latest_date)} · showcasing Sep 2024 – May 2026</div>
+        <div className="crumb">Midcap × Nifty · latest trading day {fmtDate(d.latest_date)} · showcasing {showcaseFrom} – {showcaseTo}</div>
 
         <div className="heroband fu">
           <div className="hcard main">

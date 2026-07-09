@@ -310,6 +310,6 @@ export async function dashboardHandler(req, reply) {
       expiry:  rolloverExpiry,
       label:   new Date(rolloverExpiry).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(/ /g,' '),
     },
-    latest_date: todayStr,
+    latest_date: todayDayStr,   // last actual TRADE day (e.g. 2026-06-30), for the subtitle + chart end
   }
 }
