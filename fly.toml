@@ -1,0 +1,18 @@
+# Fly.io config for the PairDesk backend.
+# Rename `app` to something globally unique before deploying.
+app = "pairdesk-api"
+primary_region = "sin"  # Singapore — closest free region to India. Change if you like.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3002
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0   # scale to zero when idle = free
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

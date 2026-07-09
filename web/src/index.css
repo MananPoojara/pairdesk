@@ -1,0 +1,2 @@
+/* Minimal reset — all real styling comes from src/pages/dashboard.css (extracted from R4). */
+#root { min-height: 100vh; }

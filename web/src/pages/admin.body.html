@@ -1,0 +1,122 @@
+<div class="subbar"><div class="in">
+  <div class="ti"><span class="n">ENV</span><span class="v">Showcase</span></div>
+  <div class="ti"><span class="n">DB</span><span class="v">Postgres · healthy</span><span class="c u">●</span></div>
+  <div class="ti"><span class="n">DATA AS-OF</span><span class="v">27 Jun 2026</span></div>
+  <div class="rt"><div class="gl" style="background:#fff;padding:6px 11px">Admin ▾</div></div>
+</div></div>
+
+<div class="shell fu">
+
+  <!-- 1 · page head -->
+  <div class="pagehd">
+    <div>
+      <div class="title">Admin</div>
+      <div class="crumb">Platform settings · charges · users · data</div>
+    </div>
+    <div class="controls"><div class="gl">⌕ Search settings</div></div>
+  </div>
+
+  <!-- 2 · Risk & sizing defaults -->
+  <div class="panel">
+    <div class="pth"><b>Risk &amp; sizing defaults</b><span class="pill">Platform-wide</span></div>
+    <div class="pbody">
+      <div class="frow">
+        <div class="field">
+          <label>Global leverage default</label>
+          <input value="1.00×">
+        </div>
+        <div class="field">
+          <label>Global exposure default</label>
+          <input value="__EXPOSURE__">
+        </div>
+        <div class="field">
+          <label>Max leverage cap</label>
+          <input value="3.00×">
+        </div>
+      </div>
+      <div class="inote">These are platform defaults; each strategy can override (global default + per-strategy override).</div>
+    </div>
+    <div class="savebar"><button class="btn">Save defaults</button></div>
+  </div>
+
+  <!-- 3 · Charge / tax configuration -->
+  <div class="panel">
+    <div class="pth"><b>Charge / tax configuration</b><span class="pill">as-of Apr 2026</span></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Charge</th><th>Rate</th><th>Applies to</th><th>Notes</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><b>STT</b></td><td class="m">0.05%</td><td>Sell-side</td><td>Futures</td><td><span class="ed">✎</span></td></tr>
+          <tr><td><b>Exchange txn charge</b></td><td class="m">₹1.73 / lakh</td><td>Both sides</td><td>NSE F&amp;O turnover</td><td><span class="ed">✎</span></td></tr>
+          <tr><td><b>SEBI turnover fee</b></td><td class="m">0.0001% +18% GST</td><td>Both sides</td><td>On turnover</td><td><span class="ed">✎</span></td></tr>
+          <tr><td><b>Stamp duty</b></td><td class="m">0.002%</td><td>Buy-side</td><td>State levy</td><td><span class="ed">✎</span></td></tr>
+          <tr><td><b>GST</b></td><td class="m">18%</td><td>On brokerage + exch + SEBI</td><td>Service tax</td><td><span class="ed">✎</span></td></tr>
+          <tr><td><b>Brokerage</b></td><td class="m">Per broker</td><td>Both sides</td><td>See below</td><td><span class="ed">✎</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="warn"><span>⚠</span><span>Rates change with SEBI/exchange circulars &amp; budgets — verify against the NSE / Angel One charge sheet before figures are final.</span></div>
+  </div>
+
+  <!-- 4 · Brokerage by broker -->
+  <div class="panel">
+    <div class="pth"><b>Brokerage by broker</b><span class="pill">2 brokers</span></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Broker</th><th>Model</th><th>Brokerage</th><th>Applies to</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><b>Affluence</b></td><td>Per lot</td><td class="m">₹20.00 / lot</td><td>Futures · both sides</td><td><span class="ed">✎</span></td></tr>
+          <tr><td><b>Sharekhan</b></td><td>Percentage</td><td class="m">0.03% of turnover</td><td>Futures · both sides</td><td><span class="ed">✎</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 5 · Users & roles -->
+  <div class="panel">
+    <div class="pth"><b>Users &amp; roles</b><button class="btn ghost" style="margin-left:auto">+ Invite user</button></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last active</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><b>Young Turtle</b></td><td class="m">career@youngturtle.ooo</td><td><span class="chiplbl inst">Owner</span></td><td>2 min ago</td><td><span class="tg2 l">Active</span></td></tr>
+          <tr><td><b>R. Mehta</b></td><td class="m">rohan.mehta@youngturtle.in</td><td><span class="chiplbl hni">Admin</span></td><td>Today, 09:14</td><td><span class="tg2 l">Active</span></td></tr>
+          <tr><td><b>S. Iyer</b></td><td class="m">sneha.iyer@youngturtle.in</td><td><span class="chiplbl retail">Analyst</span></td><td>Yesterday</td><td><span class="tg2 l">Active</span></td></tr>
+          <tr><td><b>K. Nair</b></td><td class="m">kiran.nair@youngturtle.in</td><td><span class="chiplbl retail">Viewer</span></td><td>3 days ago</td><td><span class="tg2 s">Invited</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 6 · Data ingestion -->
+  <div class="panel">
+    <div class="pth"><b>Data ingestion</b><span class="inote" style="margin:0 auto 0 0">parquet / tradesheets → Postgres ETL</span><button class="btn ghost">Run ingestion</button></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Job</th><th>Source</th><th>Last run</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><b>Futures EOD bars</b></td><td>Parquet</td><td>27 Jun 2026</td><td><span class="tg2 l">● OK</span></td></tr>
+          <tr><td><b>Tradesheets import</b></td><td>CSV / XLSX</td><td>27 Jun 2026</td><td><span class="tg2 l">● OK</span></td></tr>
+          <tr><td><b>Angel One feed</b></td><td>API</td><td>—</td><td><span class="tg2 s">○ Idle</span></td></tr>
+          <tr><td><b>Daily PnL rebuild</b></td><td>Derived</td><td>27 Jun 2026</td><td><span class="tg2 l">● OK</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 7 · Feature toggles -->
+  <div class="panel">
+    <div class="pth"><b>Feature toggles</b><span class="pill">Showcase env</span></div>
+    <div class="pbody">
+      <div class="grid2" style="margin-bottom:0">
+        <div class="tgrow"><div><div class="tl">Dark mode</div><div class="ts">UI theme across all modules</div></div><div class="toggle"></div></div>
+        <div class="tgrow"><div><div class="tl">Live execution</div><div class="ts">Route real orders to broker</div></div><div class="toggle"></div></div>
+        <div class="tgrow"><div><div class="tl">Synthetic-Future product</div><div class="ts">Enable synthetic pair instrument</div></div><div class="toggle"></div></div>
+        <div class="tgrow"><div><div class="tl">Email reports</div><div class="ts">Daily PnL &amp; ops digest</div></div><div class="toggle on"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">Admin · settings, charge config, users, data ingestion · dummy data</div>

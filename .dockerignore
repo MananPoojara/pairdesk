@@ -1,0 +1,16 @@
+**/node_modules
+web
+mockups
+Reference
+db
+.git
+.claude
+.agents
+.codex
+*.md
+*.html
+*.xlsx
+Data/*.csv
+Data/*.xlsx
+server/test
+server/*.txt

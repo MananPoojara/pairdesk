@@ -1,0 +1,24 @@
+# deps & build output
+**/node_modules
+web/dist
+
+# secrets & local env
+.deploy.env
+server/.env
+.venv-deploy/
+
+# large raw data sources — NOT needed at runtime (backend reads Data/parquet only)
+Reference/
+mockups/
+Data/*.csv
+Data/*.xlsx
+Data/SpotData/
+Data/NIFTY_FUT/
+Data/MIDCAP_FUT/
+Portfolio_Analysis_Final.xlsx
+Portfolio Results.html
+server/*.txt
+
+# misc
+.DS_Store
+*.log

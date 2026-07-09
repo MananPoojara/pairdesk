@@ -1,0 +1,16 @@
+services:
+  pairdesk-pg:
+    image: postgres:16-alpine
+    container_name: pairdesk_postgres
+    environment:
+      POSTGRES_USER: pairdesk
+      POSTGRES_PASSWORD: pairdesk2026
+      POSTGRES_DB: pairdesk_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - pairdesk_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pairdesk_pgdata:

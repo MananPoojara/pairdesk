@@ -1,0 +1,111 @@
+.pg-clients /* ── page layout ──────────────────────────────────────────── */
+.sechd {display:flex;align-items:center;gap:10px;margin:22px 0 12px}
+.pg-clients .sechd b {font-family:'Familjen Grotesk';font-weight:700;font-size:16px}
+.pg-clients .sechd .ct {font-size:11.5px;color:var(--muted);font-weight:600}
+.pg-clients .sechd .ln {flex:1;height:1px;background:var(--line)}
+.pg-clients .catbar {height:6px;border-radius:6px;background:var(--soft);overflow:hidden;margin-top:11px}
+.pg-clients .catbar i {display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--primary),var(--accent))}
+.pg-clients .crow {display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.pg-clients /* ── client card ──────────────────────────────────────────── */
+.ccard {padding:17px 18px;display:flex;flex-direction:column}
+.pg-clients .ccard .top {display:flex;align-items:flex-start;gap:10px}
+.pg-clients .ccard .nm {font-family:'Familjen Grotesk';font-weight:700;font-size:16px;margin-right:auto}
+.pg-clients .ccard .reg {font-size:11px;color:var(--muted);font-weight:600;margin-top:3px}
+.pg-clients .kvg {display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.pg-clients .kv .l {font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pg-clients .kv .v {font-family:'JetBrains Mono';font-weight:600;font-size:14px;margin-top:4px}
+.pg-clients .mini-edit {border:0;background:transparent;color:var(--primary);font:inherit;font-size:12px;cursor:pointer;padding:0 0 0 4px;vertical-align:1px}
+.pg-clients .mini-edit:hover {color:var(--accent)}
+.pg-clients .alloc-row {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.pg-clients .alloc-row div {min-width:0}
+.pg-clients .alloc-row span {display:block;font-size:8.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.pg-clients .alloc-row b {display:block;font-family:'JetBrains Mono';font-size:11.5px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-clients .mini {display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.pg-clients .mini .b {background:var(--soft);border-radius:11px;padding:9px 11px}
+.pg-clients .mini .b .l {font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pg-clients .mini .b .v {font-family:'JetBrains Mono';font-weight:600;font-size:13.5px;margin-top:4px}
+.pg-clients /* ── strategy chip (the click target) ────────────────────── */
+.strat-chip {display:inline-flex;align-items:center;gap:7px;margin-top:14px;font-size:11.5px;font-weight:700;color:var(--secondary);padding:6px 12px 6px 10px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;transition:all .2s;user-select:none;align-self:flex-start}
+.pg-clients .strat-chip::before {content:"";width:7px;height:7px;border-radius:50%;background:var(--secondary);transition:background .2s}
+.pg-clients .strat-chip .arr {font-size:9px;margin-left:auto;transition:transform .25s}
+.pg-clients .strat-chip:hover {border-color:var(--secondary);background:#EAF7FE}
+.pg-clients .strat-chip.active {background:var(--secondary);color:#fff;border-color:var(--secondary)}
+.pg-clients .strat-chip.active::before {background:#fff}
+.pg-clients .strat-chip.active .arr {transform:rotate(180deg)}
+.pg-clients /* ── drawer ───────────────────────────────────────────────── */
+.drawer-wrap {overflow:hidden;max-height:0;transition:max-height .45s cubic-bezier(.4,0,.2,1)}
+.pg-clients .drawer-wrap.open {max-height:2800px}
+.pg-clients .drawer {margin:14px 0 6px;border:1.5px solid var(--accent);border-radius:16px;overflow:hidden;box-shadow:0 16px 40px -24px rgba(249,115,22,.35)}
+.pg-clients .d-head {display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,#FFF4E9,#EAF7FE)}
+.pg-clients .d-head b {font-family:'Familjen Grotesk';font-weight:700;font-size:15px;margin-right:auto}
+.pg-clients .d-head .sub {font-size:11px;color:var(--muted);font-weight:600}
+.pg-clients .d-close {width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px;color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.pg-clients .d-close:hover {background:var(--soft)}
+.pg-clients /* hero strip */
+.d-hero {display:flex;gap:0;border-bottom:1px solid var(--line);overflow-x:auto}
+.pg-clients .d-hero .hk {padding:14px 20px;display:flex;flex-direction:column;gap:3px;border-right:1px solid var(--line)}
+.pg-clients .d-hero .hk:last-child {border-right:none}
+.pg-clients .d-hero .hk .l {font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.pg-clients .d-hero .hk .v {font-family:'JetBrains Mono';font-weight:700;font-size:19px}
+.pg-clients /* equity curve */
+.curve-wrap {padding:16px 18px 0;border-bottom:1px solid var(--line);position:relative}
+.pg-clients .curve-lbl {font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.pg-clients .curve-lbl > span:first-child {margin-right:auto}
+.pg-clients .bt-toggle{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px 4px 5px;display:flex;align-items:center;gap:5px;font-family:inherit;font-size:10.5px;font-weight:800;color:#6b6457;cursor:pointer;text-transform:none;letter-spacing:0}
+.pg-clients .bt-toggle span{width:8px;height:8px;border-radius:50%;background:#CDBFA9;box-shadow:0 0 0 3px rgba(205,191,169,.18)}
+.pg-clients .bt-toggle.on{color:var(--primary);border-color:#FED7AA;background:#FFF7EF}
+.pg-clients .bt-toggle.on span{background:var(--primary);box-shadow:0 0 0 3px rgba(249,115,22,.16)}
+.pg-clients .backtest-line{pointer-events:none}
+/* Pair-level combined P/L & % — merged once across both legs of a pair */
+.pg-clients .pair-cell{border-left:1px solid var(--line);background:#FCFAF6}
+.pg-clients .curve-svg {width:100%;height:190px;display:block;overflow:visible;cursor:crosshair}
+.pg-clients .curve-foot {display:flex;justify-content:space-between;padding:5px 0 14px;font-size:9px;color:var(--muted);font-weight:600}
+.pg-clients .curve-foot .bt-foot{margin-left:auto;color:var(--primary);font-weight:800}
+.pg-clients /* curve hover tooltip */
+.crv-tip {position:absolute;z-index:5;pointer-events:none;background:#0F1B2D;color:#fff;border-radius:9px;padding:8px 11px;min-width:118px;box-shadow:0 10px 28px -10px rgba(15,27,45,.55);opacity:0;transition:opacity .12s;transform:translateZ(0)}
+.pg-clients .crv-tip .tt-mo {font-family:'Familjen Grotesk';font-weight:700;font-size:12px;margin-bottom:5px;letter-spacing:.02em}
+.pg-clients .crv-tip .tt-row {display:flex;justify-content:space-between;gap:14px;align-items:center;font-size:11px;line-height:1.7}
+.pg-clients .crv-tip .tt-row span {color:#94A3B8;font-weight:600}
+.pg-clients .crv-tip .tt-row b {font-family:'JetBrains Mono';font-weight:600}
+.pg-clients .crv-tip .tt-row b.u {color:#5EE0A8}
+.pg-clients .crv-tip .tt-row b.d {color:#FDA47A}
+.pg-clients /* heatmap + stats two-col */
+.d-grid2 {display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--line)}
+.pg-clients .d-grid2 > div {padding:14px 18px}
+.pg-clients .d-grid2 > div:first-child {border-right:1px solid var(--line)}
+.pg-clients /* full-width drawer section */
+.d-sec {padding:15px 18px;border-bottom:1px solid var(--line)}
+.pg-clients .d-sec-l {font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:11px}
+.pg-clients /* heatmap — compact,.pg-clients capped width so cells stay cohesive (not stretched) */
+.hm {display:grid;grid-template-columns:30px repeat(12,minmax(0,60px));gap:5px;justify-content:start}
+.pg-clients .hm .yl {font-size:11px;color:var(--muted);font-weight:700;display:flex;align-items:center}
+.pg-clients .hm .cell {height:40px;border-radius:7px;background:var(--soft);cursor:default;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-weight:600;font-size:10.5px;letter-spacing:-.02em;transition:transform .12s}
+.pg-clients .hm .cell:not(.empty):hover {transform:scale(1.08)}
+.pg-clients .hm .cell.empty {background:#F4EFE7;box-shadow:inset 0 0 0 1px rgba(176,152,120,.16);color:transparent}
+.pg-clients .hmx {display:grid;grid-template-columns:30px repeat(12,minmax(0,60px));gap:5px;margin-top:5px;justify-content:start}
+.pg-clients .hmx span {font-size:10px;color:var(--muted);font-weight:700;text-align:center}
+.pg-clients /* stats tile grid */
+.stat-grid {display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pg-clients .stat-grid .sc {background:var(--soft);border-radius:12px;padding:11px 13px}
+.pg-clients .stat-grid .sc .l {font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pg-clients .stat-grid .sc .v {font-family:'JetBrains Mono';font-weight:600;font-size:15px;margin-top:6px}
+.pg-clients /* trades */
+.d-trades .tl {padding:13px 18px 0;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pg-clients /* charge footer */
+.d-charges {display:flex;gap:0;background:var(--soft);border-top:1px solid var(--line);flex-wrap:wrap}
+.pg-clients .d-charges .ci {padding:10px 16px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line)}
+.pg-clients .d-charges .ci:last-child {border-right:none;margin-left:auto}
+.pg-clients .d-charges .ci .l {font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.pg-clients .d-charges .ci .v {font-family:'JetBrains Mono';font-size:12px;font-weight:600}
+.pg-clients /* range chips */
+.rng-bar {display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--soft)}
+.pg-clients .rng-chip {background:none;border:1.5px solid var(--line);border-radius:20px;padding:4px 14px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;font-family:inherit}
+.pg-clients .rng-chip:hover {border-color:var(--secondary);color:var(--secondary)}
+.pg-clients .rng-chip.active {background:var(--secondary);border-color:var(--secondary);color:#fff}
+.pg-clients /* skeleton */
+.sk {background:linear-gradient(90deg,var(--soft) 25%,#f0ece6 50%,var(--soft) 75%);background-size:200% 100%;animation:sk 1.2s infinite;border-radius:8px}
+
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* FIX: keep the category-tile bento auto-height (dashboard's global 96px rows would clip it) */
+.pg-clients .bento{grid-auto-rows:auto}

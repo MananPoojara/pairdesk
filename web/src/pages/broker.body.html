@@ -1,0 +1,207 @@
+<div class="subbar"><div class="in">
+  <div class="ti"><span class="n">NIFTY 50</span><span class="v">24,265</span><span class="c d">▼0.18%</span></div>
+  <div class="ti"><span class="n">MIDCAP SELECT</span><span class="v">13,498</span><span class="c u">▲0.58%</span></div>
+  <div class="ti"><span class="n">NIFTY BANK</span><span class="v">52,140</span><span class="c u">▲0.21%</span></div>
+  <div class="rt"><div class="gl" style="background:#fff;padding:6px 11px">All connections ▾</div></div>
+</div></div>
+
+<div class="shell fu">
+
+  <!-- 1) page header -->
+  <div class="pagehd">
+    <div>
+      <div class="title">Brokers</div>
+      <div class="crumb" style="margin-bottom:0">Connections &amp; order routing</div>
+    </div>
+    <div class="controls">
+      <button class="btn">+ Add client connection</button>
+    </div>
+  </div>
+
+  <!-- 2) broker cards -->
+  <div class="bento" style="margin-bottom:14px">
+
+    <div class="t c6 bk">
+      <div class="bkhd">
+        <div class="blogo">A</div>
+        <div class="bword">
+          <div class="nm">Affluence</div>
+          <div class="ty">Affluence Broking · NSE / BSE F&amp;O</div>
+        </div>
+        <div class="bkst"><span class="tg2 l">● Connected</span></div>
+      </div>
+      <div>
+        <div class="brow"><span class="k">Login ID</span><span class="vv">AFF-YT-4471</span></div>
+        <div class="brow"><span class="k">Server</span><span class="vv">api.affluence.in · prod</span></div>
+        <div class="brow"><span class="k">Last sync</span><span class="vv">Today · 09:14:52</span></div>
+        <div class="brow"><span class="k">Clients routed</span><span class="vv">3 clients</span></div>
+      </div>
+      <div class="bkact">
+        <button class="btn ghost">Manage ▾</button>
+        <button class="btn">Reconnect</button>
+      </div>
+    </div>
+
+    <div class="t c6 bk">
+      <div class="bkhd">
+        <div class="blogo sky">S</div>
+        <div class="bword">
+          <div class="nm">Sharekhan</div>
+          <div class="ty">Sharekhan Ltd · NSE / BSE F&amp;O</div>
+        </div>
+        <div class="bkst"><span class="tg2 l">● Connected</span></div>
+      </div>
+      <div>
+        <div class="brow"><span class="k">Login ID</span><span class="vv">SK-YT-90212</span></div>
+        <div class="brow"><span class="k">Server</span><span class="vv">tradeapi.sharekhan.com · prod</span></div>
+        <div class="brow"><span class="k">Last sync</span><span class="vv">Today · 09:14:50</span></div>
+        <div class="brow"><span class="k">Clients routed</span><span class="vv">3 clients</span></div>
+      </div>
+      <div class="bkact">
+        <button class="btn ghost">Manage ▾</button>
+        <button class="btn">Reconnect</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3) product mode -->
+  <div class="panel psec" style="margin-bottom:14px">
+    <div class="ph"><b>Execution product</b><span class="tg2 l">live default · Futures</span></div>
+    <div class="exp">In live execution, trades execute on <b>FUTURES</b> values — just as options are traded today.
+      Choose how each index leg is built when orders are routed to the broker.</div>
+    <div class="modes">
+      <div class="mode sel">
+        <div class="mt"><b>Futures</b><div class="toggle on"></div></div>
+        <div class="md">Outright index futures legs — orders sent directly on the listed NIFTY / BANKNIFTY futures contract.</div>
+      </div>
+      <div class="mode">
+        <div class="mt"><b>Synthetic Future</b><div class="toggle"></div></div>
+        <div class="md">Built from options (long call + short put at ATM) to replicate the futures payoff when margin or liquidity favours it.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4) add-client connection form -->
+  <div class="panel psec" style="margin-bottom:14px">
+    <div class="ph"><b>Connect a client to a broker</b><span class="tg2 s">auth required</span></div>
+    <div class="exp">Authenticate the client's broker account once. Credentials are stored encrypted and used only for order routing.</div>
+    <div class="formgrid">
+      <div class="field">
+        <label>Broker</label>
+        <select><option>Affluence</option><option>Sharekhan</option></select>
+      </div>
+      <div class="field">
+        <label>Client</label>
+        <select>
+          <option>Ashford Capital Partners — PD-INST-01</option>
+          <option>Meridian Pension Fund — PD-INST-02</option>
+          <option>Rohan Khanna — PD-HNI-01</option>
+          <option>Vaidehi Mehta — PD-HNI-02</option>
+          <option>Sanjay Iyer — PD-RTL-01</option>
+          <option>Priya Nair — PD-RTL-02</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <input type="text" placeholder="afl_live_a1b2c3d4e5f6g7h8">
+      </div>
+      <div class="field">
+        <label>API Secret</label>
+        <input type="password" placeholder="••••••••••••••••••••••••">
+      </div>
+      <div class="field">
+        <label>Client / User ID</label>
+        <input type="text" placeholder="PD-HNI-01">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" placeholder="••••••••••••">
+      </div>
+      <div class="field">
+        <label>TOTP / 2FA Secret</label>
+        <input type="text" placeholder="JBSWY3DPEHPK3PXP">
+      </div>
+      <div class="field">
+        <label>Redirect / Postback URL</label>
+        <input type="text" placeholder="https://app.youngturtle.in/broker/callback">
+      </div>
+      <div class="field">
+        <label>Product</label>
+        <select><option>Futures</option><option>Synthetic Future</option></select>
+      </div>
+      <div class="field" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <div class="formact">
+          <button class="btn ghost">Test connection</button>
+          <button class="btn">Save &amp; connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5) connected clients table -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="pth"><b>Connected clients</b><span class="srch">6 active connections</span></div>
+    <div class="tscroll">
+      <table class="ttable">
+        <thead><tr>
+          <th>Client</th><th>Code</th><th>Broker</th><th>Product</th><th>Status</th><th>Last order</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="cli">Ashford Capital Partners<small>Institutional</small></td>
+            <td class="code">PD-INST-01</td>
+            <td>Affluence</td>
+            <td><span class="pmode">Futures</span></td>
+            <td><span class="tg2 l">Active</span></td>
+            <td>Today · 09:12</td>
+          </tr>
+          <tr>
+            <td class="cli">Meridian Pension Fund<small>Institutional</small></td>
+            <td class="code">PD-INST-02</td>
+            <td>Sharekhan</td>
+            <td><span class="pmode">Futures</span></td>
+            <td><span class="tg2 l">Active</span></td>
+            <td>Today · 09:11</td>
+          </tr>
+          <tr>
+            <td class="cli">Rohan Khanna<small>HNI</small></td>
+            <td class="code">PD-HNI-01</td>
+            <td>Affluence</td>
+            <td><span class="pmode syn">Synthetic Future</span></td>
+            <td><span class="tg2 l">Active</span></td>
+            <td>Today · 09:09</td>
+          </tr>
+          <tr>
+            <td class="cli">Vaidehi Mehta<small>HNI</small></td>
+            <td class="code">PD-HNI-02</td>
+            <td>Sharekhan</td>
+            <td><span class="pmode">Futures</span></td>
+            <td><span class="tg2 l">Active</span></td>
+            <td>Today · 09:08</td>
+          </tr>
+          <tr>
+            <td class="cli">Sanjay Iyer<small>Retail</small></td>
+            <td class="code">PD-RTL-01</td>
+            <td>Affluence</td>
+            <td><span class="pmode">Futures</span></td>
+            <td><span class="tg2 l">Active</span></td>
+            <td>Today · 09:06</td>
+          </tr>
+          <tr>
+            <td class="cli">Priya Nair<small>Retail</small></td>
+            <td class="code">PD-RTL-02</td>
+            <td>Sharekhan</td>
+            <td><span class="pmode syn">Synthetic Future</span></td>
+            <td><span class="tg2 l">Active</span></td>
+            <td>Today · 09:04</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">Broker · Affluence + Sharekhan, Futures/Synthetic-Future modes, add-client auth · dummy data</div>

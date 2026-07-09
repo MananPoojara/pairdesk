@@ -1,0 +1,17 @@
+.pg-admin /* minimal page-only CSS */
+  .grid2 {display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.pg-admin .panel {margin-bottom:14px}
+.pg-admin .pbody {padding:0 18px 18px}
+.pg-admin .frow {display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.pg-admin .pill {font-family:'JetBrains Mono';font-size:11px;font-weight:600;background:var(--soft);color:var(--primary);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+.pg-admin .ed {color:var(--primary);cursor:pointer;font-weight:700;font-size:12.5px;user-select:none}
+.pg-admin .warn {display:flex;gap:8px;align-items:flex-start;background:#FBEAE1;color:#9A3412;border:1px solid #F4D6C6;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:600;margin:12px 18px 0}
+.pg-admin .inote {color:var(--muted);font-size:12px;font-weight:600;margin-top:2px;line-height:1.5}
+.pg-admin .tgrow {display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.pg-admin .tgrow .tl {font-weight:700;font-size:13.5px}
+.pg-admin .tgrow .ts {font-size:11.5px;color:var(--muted);font-weight:600;margin-top:3px}
+.pg-admin .savebar {display:flex;justify-content:flex-end;padding:14px 18px 0}
+.pg-admin .dot {width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.pg-admin .dot.ok {background:var(--pos)}
+.pg-admin .dot.idle {background:var(--muted)}
+
