@@ -407,7 +407,7 @@ export default function Dashboard() {
           </div>
 
           {/* Margin */}
-          <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.05s' }}>
+          <div className="t c4 r2 flexcol fu" style={{ animationDelay: '.05s' }}>
             <div className="l">Margin</div>
             <div className="v" style={{ fontSize: 18 }}>{fmtCr(marginCr)}</div>
             <div className="meter"><i className="used" style={{ width: '25%' }}></i><i className="free" style={{ width: '75%' }}></i></div>
@@ -415,8 +415,18 @@ export default function Dashboard() {
             <div className="s" style={{ marginTop: 'auto' }}>25% utilised · EOD</div>
           </div>
 
+          {/* Return on AUM / Avg AUM (moved out of the Period P&L row) */}
+          <div className="t c3 r2 flexcol fu" style={{ animationDelay: '.06s' }}>
+            <div className="l">Return on AUM <span className="meta">net ÷ avg AUM</span></div>
+            <div className={'v ' + (pctOnAum >= 0 ? 'u' : 'd')} style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{(pctOnAum >= 0 ? '+' : '') + pctOnAum.toFixed(2)}%</div>
+            <div style={{ borderTop: '1px solid var(--line)', marginTop: 'auto', paddingTop: 10 }}>
+              <div className="s" style={{ margin: 0 }}>Avg AUM · deployed</div>
+              <div className="m" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{fmtCr(baseAumCr)}</div>
+            </div>
+          </div>
+
           {/* Exposure by leg */}
-          <div className="t c7 r2 flexcol fu" style={{ animationDelay: '.1s' }}>
+          <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.1s' }}>
             <div className="l">Exposure by leg <span className="meta">net notional · live book</span></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12, flex: 1 }}>
               <LegCard name="Nifty" dir={niftyPos?.direction || 'SHORT'} cr={half} total={book.exposure_cr} color="#F97316" />
@@ -424,7 +434,7 @@ export default function Dashboard() {
             </div>
             <div className="mleg" style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
               <span>Gross exposure <b>{fmtCr(book.exposure_cr)}</b></span>
-              <span>Net (long − short) <b>{fmtCr(0)}</b></span>
+              <span>Net (L−S) <b>{fmtCr(0)}</b></span>
               <span>Leverage <b>{book.leverage.toFixed(2)}×</b></span>
             </div>
           </div>
@@ -446,13 +456,11 @@ export default function Dashboard() {
           {periodStat && (
             <div className="t c12 todaytile fu">
               <div className="hd"><b><span className="dot"></span>Period P&amp;L</b><span>net realised · month &amp; quarter</span></div>
-              <div className="cells">
+              <div className="cells" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
                 <PCell l="Current Month" sub={fmtMonYr(periodStat.curMonth.month)} inr={periodStat.curMonth.net_inr} pct={periodStat.curMonth.pct} />
                 <PCell l="Last Month" sub={periodStat.lastMonth ? fmtMonYr(periodStat.lastMonth.month) : '—'} inr={periodStat.lastMonth ? periodStat.lastMonth.net_inr : null} pct={periodStat.lastMonth ? periodStat.lastMonth.pct : null} />
                 <PCell l="Current Quarter" sub={qLabel(periodStat.cq.y, periodStat.cq.q)} inr={periodStat.cq.net} pct={periodStat.cq.pct} />
                 <PCell l="Last Quarter" sub={qLabel(periodStat.lq.y, periodStat.lq.q)} inr={periodStat.lq.net} pct={periodStat.lq.pct} />
-                <PCell l="Return on AUM" sub="net ÷ avg AUM" pctOnly={pctOnAum} />
-                <PCell l="Avg AUM" sub="deployed" text={fmtCr(baseAumCr)} />
               </div>
             </div>
           )}
