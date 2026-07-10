@@ -116,6 +116,33 @@ export default function Dashboard() {
   }
   const showcaseFrom = d.monthly?.length ? fmtMonYr(d.monthly[0].month) : ''
   const showcaseTo   = d.monthly?.length ? fmtMonYr(d.monthly[d.monthly.length - 1].month) : ''
+
+  // Period P&L — current/last month & quarter, from the full monthly series (fixed, not range-dependent).
+  // Percentages use the deployed capital (base_aum_cr, ₹30 Cr) — same basis as every other % in the app.
+  const baseAumCr = d.book.base_aum_cr ?? 30
+  const monthsAll = d.monthly || []
+  const q0 = mo => Math.floor((mo - 1) / 3)                 // 0-based calendar quarter
+  const qLabel = (y, q) => `Q${q + 1} '${String(y).slice(2)}`
+  const pctOfBase = net => baseAumCr > 0 ? +(net / (baseAumCr * 1e7) * 100).toFixed(2) : 0
+  const periodStat = (() => {
+    if (!monthsAll.length) return null
+    const last = monthsAll[monthsAll.length - 1]
+    const prev = monthsAll.length > 1 ? monthsAll[monthsAll.length - 2] : null
+    const ly = +last.month.slice(0, 4), lm = +last.month.slice(5, 7)
+    const cq = { y: ly, q: q0(lm) }
+    const lq = cq.q > 0 ? { y: ly, q: cq.q - 1 } : { y: ly - 1, q: 3 }
+    const sumQ = (yy, qq) => monthsAll
+      .filter(r => +r.month.slice(0, 4) === yy && q0(+r.month.slice(5, 7)) === qq)
+      .reduce((s, r) => s + (r.net_inr || 0), 0)
+    const cqNet = sumQ(cq.y, cq.q), lqNet = sumQ(lq.y, lq.q)
+    return {
+      curMonth: last, lastMonth: prev,
+      cq: { ...cq, net: cqNet, pct: pctOfBase(cqNet) },
+      lq: { ...lq, net: lqNet, pct: pctOfBase(lqNet) },
+    }
+  })()
+  const totalNetAll = monthsAll.reduce((s, r) => s + (r.net_inr || 0), 0)
+  const pctOnAum = pctOfBase(totalNetAll)
   const heroAmt = mode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
   const heroReal = mode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
   const heroSince = mode === 'overall'
@@ -362,6 +389,21 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Period P&L */}
+          {periodStat && (
+            <div className="t c12 todaytile fu">
+              <div className="hd"><b><span className="dot"></span>Period P&amp;L</b><span>net realised · month &amp; quarter</span></div>
+              <div className="cells">
+                <PCell l="Current Month" sub={fmtMonYr(periodStat.curMonth.month)} inr={periodStat.curMonth.net_inr} pct={periodStat.curMonth.pct} />
+                <PCell l="Last Month" sub={periodStat.lastMonth ? fmtMonYr(periodStat.lastMonth.month) : '—'} inr={periodStat.lastMonth ? periodStat.lastMonth.net_inr : null} pct={periodStat.lastMonth ? periodStat.lastMonth.pct : null} />
+                <PCell l="Current Quarter" sub={qLabel(periodStat.cq.y, periodStat.cq.q)} inr={periodStat.cq.net} pct={periodStat.cq.pct} />
+                <PCell l="Last Quarter" sub={qLabel(periodStat.lq.y, periodStat.lq.q)} inr={periodStat.lq.net} pct={periodStat.lq.pct} />
+                <PCell l="Return on AUM" sub="net ÷ avg AUM" pctOnly={pctOnAum} />
+                <PCell l="Avg AUM" sub="deployed" text={fmtCr(baseAumCr)} />
+              </div>
+            </div>
+          )}
+
           {/* Positions */}
           <div className="t c12 postile fu" style={{ gridRow: 'span 3' }}>
             <div className="pth"><b>Open Positions</b>
@@ -423,6 +465,19 @@ function Mc({ l, v }) {
 }
 function Cell({ l, v }) {
   return <div className="cell"><div className="l">{l}</div><div className="v">{v}</div></div>
+}
+function PCell({ l, sub, inr, pct, pctOnly, text }) {
+  let val, cls = ''
+  if (text != null) { val = text }
+  else if (pctOnly != null) { val = (pctOnly >= 0 ? '+' : '') + pctOnly.toFixed(2) + '%'; cls = pctOnly >= 0 ? 'u' : 'd' }
+  else if (inr == null) { val = '—' }
+  else { val = fmtInr(inr); cls = inr >= 0 ? 'u' : 'd' }
+  return (
+    <div className="cell">
+      <div className="l">{l}{sub ? <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 600 }}> · {sub}</span> : null}</div>
+      <div className={'v ' + cls}>{val}{pct != null && inr != null ? <span style={{ fontSize: 10.5, marginLeft: 5, color: 'var(--muted)', fontWeight: 600 }}>{(pct >= 0 ? '+' : '') + pct.toFixed(2) + '%'}</span> : null}</div>
+    </div>
+  )
 }
 function MiniStat({ l, v, cls }) {
   return (

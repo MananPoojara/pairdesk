@@ -307,6 +307,8 @@ function ClientCard({ c, cls, cat, idx, active, onToggle, onEdit }) {
   const exposureCr = strategy?.exposure_cr ?? allocationCr
   const leverage = strategy?.leverage ?? (allocationCr > 0 ? exposureCr / allocationCr : 0)
   const allocPct = c.aum_cr > 0 ? (allocationCr / c.aum_cr * 100).toFixed(1) : '0.0'
+  const marginCr = exposureCr * 0.12          // ~12% margin (SPAN + exposure) on notional
+  const legExpCr = exposureCr / 2             // pair legs are notionally balanced — half the exposure each
   return (
     <div className="panel ccard fu" style={{ animationDelay: idx * 0.06 + 's' }}>
       <div className="top">
@@ -322,6 +324,12 @@ function ClientCard({ c, cls, cat, idx, active, onToggle, onEdit }) {
         <div><span>Allocation</span><b>{fCr(allocationCr)}</b><span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 3 }}>{allocPct}%</span></div>
         <div><span>Exposure</span><b>{fCr(exposureCr)}</b></div>
         <div><span>Lev</span><b>{fmtLev(leverage)}</b></div>
+      </div>
+      <div style={{ fontSize: 8.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', margin: '9px 2px 0' }}>Net Exposure (long / short)</div>
+      <div className="alloc-row" style={{ marginTop: 4 }}>
+        <div><span>Long · Midcap</span><b>{fCr(legExpCr)}</b></div>
+        <div><span>Short · Nifty</span><b>{fCr(legExpCr)}</b></div>
+        <div><span>Margin · 12%</span><b>{fCr(marginCr)}</b></div>
       </div>
       <div className="mini">
         <div className="b"><div className="l">Sharpe</div><div className="v">{c.stats.sharpe}</div></div>
