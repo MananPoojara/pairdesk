@@ -113,3 +113,12 @@ tbody td{padding:11px 13px;border-bottom:1px solid #F4ECDF}tbody tr:hover{backgr
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#EBD9C4;border-radius:8px}
 .note{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#1F1B16;color:#fff;font-size:12px;padding:8px 16px;border-radius:30px;opacity:.95;font-weight:500;z-index:30}
 .skeleton{background:linear-gradient(90deg,#F0E7D9 25%,#FCF6EE 50%,#F0E7D9 75%);background-size:200%;animation:sk 1.2s infinite}@keyframes sk{0%{background-position:200%}100%{background-position:-200%}}
+
+/* Index / Instrument variant chips (mirrors .pg-strategies .chip; dashboard.css is global) */
+.pg-dash .chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pg-dash .chip{border:1px solid var(--line);background:#fff;font-family:inherit;font-weight:700;font-size:12px;color:#6b6457;padding:6px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s}
+.pg-dash .chip:hover{border-color:var(--primary);color:var(--primary)}
+.pg-dash .chip.on{background:linear-gradient(135deg,var(--primary),var(--accent));border-color:transparent;color:#fff;box-shadow:0 6px 14px -8px rgba(249,115,22,.55)}
+/* Period P&L cell: period + % sub-line, keeps the same 6-column todaytile look as Latest Day */
+.todaytile .cell .sub{font-size:10px;font-weight:700;margin-top:2px;font-family:'JetBrains Mono';letter-spacing:-.02em}
+.todaytile .cell .l .per{text-transform:none;color:var(--muted);font-weight:600;margin-left:5px}

@@ -27,8 +27,8 @@ const CATCOLOR = { Institution: '#0EA5E9', HNI: '#38BDF8', Retail: '#F97316' }
 const CATCLS = { Institution: 'inst', HNI: 'hni', Retail: 'retail' }
 const IDX = ['All Indices', 'NIFTY 50', 'NIFTY MIDCAP SELECT', 'Combined (pair)']
 const EQ_W = 700
-const EQ_H = 70
-const EQ_PAD = 6
+const EQ_H = 80
+const EQ_PAD = 8
 
 export default function Dashboard() {
   const { data: d, isError, error } = useQuery({
@@ -416,11 +416,16 @@ export default function Dashboard() {
           </div>
 
           {/* Exposure by leg */}
-          <div className="t c9 flexcol fu" style={{ animationDelay: '.1s' }}>
-            <div className="l">Exposure by leg</div>
-            <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
-              <div><div className="s" style={{ margin: 0 }}>Nifty ({(niftyPos?.direction || 'SHORT').toLowerCase()})</div><div className="m" style={{ fontSize: 14, fontWeight: 600 }}>{fmtCr(half)}</div></div>
-              <div><div className="s" style={{ margin: 0 }}>Midcap ({(midPos?.direction || 'LONG').toLowerCase()})</div><div className="m" style={{ fontSize: 14, fontWeight: 600 }}>{fmtCr(half)}</div></div>
+          <div className="t c7 r2 flexcol fu" style={{ animationDelay: '.1s' }}>
+            <div className="l">Exposure by leg <span className="meta">net notional · live book</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12, flex: 1 }}>
+              <LegCard name="Nifty" dir={niftyPos?.direction || 'SHORT'} cr={half} total={book.exposure_cr} color="#F97316" />
+              <LegCard name="Midcap" dir={midPos?.direction || 'LONG'} cr={half} total={book.exposure_cr} color="#0EA5E9" />
+            </div>
+            <div className="mleg" style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+              <span>Gross exposure <b>{fmtCr(book.exposure_cr)}</b></span>
+              <span>Net (long − short) <b>{fmtCr(0)}</b></span>
+              <span>Leverage <b>{book.leverage.toFixed(2)}×</b></span>
             </div>
           </div>
 
@@ -522,8 +527,26 @@ function PCell({ l, sub, inr, pct, pctOnly, text }) {
   else { val = fmtInr(inr); cls = inr >= 0 ? 'u' : 'd' }
   return (
     <div className="cell">
-      <div className="l">{l}{sub ? <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 600 }}> · {sub}</span> : null}</div>
-      <div className={'v ' + cls}>{val}{pct != null && inr != null ? <span style={{ fontSize: 10.5, marginLeft: 5, color: 'var(--muted)', fontWeight: 600 }}>{(pct >= 0 ? '+' : '') + pct.toFixed(2) + '%'}</span> : null}</div>
+      <div className="l">{l}{sub ? <span className="per">{sub}</span> : null}</div>
+      <div className={'v ' + cls}>{val}</div>
+      {pct != null && inr != null && <div className={'sub ' + cls}>{(pct >= 0 ? '+' : '') + pct.toFixed(2) + '%'}</div>}
+    </div>
+  )
+}
+function LegCard({ name, dir, cr, total, color }) {
+  const pct = total > 0 ? (cr / total * 100) : 50
+  const isLong = dir === 'LONG'
+  return (
+    <div style={{ background: 'var(--soft)', borderRadius: 10, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>{name}</span>
+        <span className={'tg2 ' + (isLong ? 'l' : 's')} style={{ fontSize: 9.5 }}>{dir}</span>
+      </div>
+      <div className="m" style={{ fontSize: 19, fontWeight: 700 }}>{fmtCr(cr)}</div>
+      <div style={{ height: 5, borderRadius: 3, background: '#EBDFCE', overflow: 'hidden' }}>
+        <i style={{ display: 'block', height: '100%', width: pct + '%', background: color }} />
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>{pct.toFixed(0)}% of gross</div>
     </div>
   )
 }

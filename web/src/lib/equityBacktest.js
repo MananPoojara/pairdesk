@@ -90,7 +90,13 @@ export function timelineTicks(domain, rows, maxTicks = 6) {
   const step = Math.max(1, Math.ceil((visible.length - 1) / Math.max(1, target - 1)))
   const indexes = []
   for (let i = 0; i < visible.length; i += step) indexes.push(i)
-  if (indexes[indexes.length - 1] !== visible.length - 1) indexes.push(visible.length - 1)
+  // Always include the final month, but if it's within half a step of the last tick,
+  // replace that tick instead of appending — otherwise the two labels overlap/crowd.
+  const lastIdx = visible.length - 1
+  if (indexes[indexes.length - 1] !== lastIdx) {
+    if (lastIdx - indexes[indexes.length - 1] <= step / 2) indexes[indexes.length - 1] = lastIdx
+    else indexes.push(lastIdx)
+  }
   return indexes.map(index => {
     const row = visible[index]
     const xPct = (dateMs(row.month) - domain.start) / (domain.end - domain.start || 1) * 100
