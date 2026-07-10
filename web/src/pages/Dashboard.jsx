@@ -21,6 +21,7 @@ import {
   timelineTicks,
 } from '../lib/equityBacktest'
 import { yearlyReturns } from '../lib/riskAnalytics'
+import { VARIANTS } from '../lib/variantData'
 
 const CATCOLOR = { Institution: '#0EA5E9', HNI: '#38BDF8', Retail: '#F97316' }
 const CATCLS = { Institution: 'inst', HNI: 'hni', Retail: 'retail' }
@@ -48,6 +49,8 @@ export default function Dashboard() {
   const [breakdown, setBreakdown] = useState(false)
   const [equityTip, setEquityTip] = useState(null)
   const [showBacktest, setShowBacktest] = useState(true)
+  const [dIndexChip, setDIndexChip] = useState('combined')  // combined | nifty | midcap | banknifty
+  const [dInstrMode, setDInstrMode] = useState('fut')        // fut | opt
 
   if (isError) return <div className="shell"><div className="crumb">⚠ Could not reach API — is the server running on :3002? ({String(error?.message)})</div></div>
   if (!d) return <div className="shell"><div className="crumb">Loading…</div></div>
@@ -59,28 +62,45 @@ export default function Dashboard() {
   const totalUnreal = (niftyPos?.unrealised_inr || 0) + (midPos?.unrealised_inr || 0)
   const spreadPct = totalUnreal / d.book.aum_cr / 1e7 * 100
 
-  const presetDates = getDashboardPresetDates(d.monthly, range === 'Custom' ? 'All' : range, d.latest_date)
+  // Variant toggle: Options / BankNifty swap the PERFORMANCE data (curve, heatmap, yearly,
+  // hero PnL) to hardcoded verified showcase data. The live book (positions, clients, margin)
+  // stays as-is. Default (Combined + Fut) → vActive null → identical to before.
+  const vActive = dInstrMode === 'opt' ? VARIANTS.options
+    : dIndexChip === 'banknifty' ? VARIANTS.banknifty
+    : null
+  const srcMonthly = vActive ? vActive.monthly : d.monthly
+  const perfLatest = vActive ? srcMonthly[srcMonthly.length - 1].month : d.latest_date
+
+  const presetDates = getDashboardPresetDates(srcMonthly, range === 'Custom' ? 'All' : range, perfLatest)
   const startDate = customStartDate || presetDates.start
   const endDate = customEndDate || presetDates.end
-  const minDate = firstMonthlyDate(d.monthly)
-  const maxDate = lastMonthlyDate(d.monthly, d.latest_date)
+  const minDate = firstMonthlyDate(srcMonthly)
+  const maxDate = lastMonthlyDate(srcMonthly, perfLatest)
   const selectedMonthly = range === 'Custom'
-    ? selectDashboardDateRange(d.monthly, startDate, endDate)
-    : selectDashboardRange(d.monthly, range)
+    ? selectDashboardDateRange(srcMonthly, startDate, endDate)
+    : selectDashboardRange(srcMonthly, range)
   const rangeStats = buildDashboardRangeStats(selectedMonthly, d.book.base_aum_cr ?? 30)
-  const pairMaxDd = Number(d.stats?.pair_max_dd_pct ?? d.stats?.max_dd_pct ?? rangeStats.max_dd_pct)
+  const pairMaxDd = vActive ? Number(vActive.summary.pair_max_dd_pct)
+    : Number(d.stats?.pair_max_dd_pct ?? d.stats?.max_dd_pct ?? rangeStats.max_dd_pct)
   const curveMonthly = rangeStats.monthly
   const heroPath = buildCurvePath(curveMonthly, 560, 70, 4)
   const chartDomain = equityDomain(startDate, endDate, curveMonthly)
   const liveRows = curveMonthly.map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
-  const backtestRows = buildBacktestRows(d.backtest?.series, chartDomain, d.backtest?.base_aum_cr ?? 30)
+  // Spot backtest overlay only matches the main Fut strategy — hide it for variants.
+  const backtestRows = vActive ? [] : buildBacktestRows(d.backtest?.series, chartDomain, d.backtest?.base_aum_cr ?? 30)
   const valueDomain = equityValueDomain(liveRows, [])
   const eqPath = buildDateCurvePath(liveRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const backtestPath = buildDateCurvePath(backtestRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const eqPts = dateLinePoints(liveRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const backtestPts = dateLinePoints(backtestRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const timeline = timelineTicks(chartDomain, curveMonthly)
-  const eoyReturns = yearlyReturns(d.monthly, d.book.base_aum_cr ?? 30)
+  // Variants precompute correct per-year (compounded) + raw best/worst stats — the shared
+  // net_inr-derived stats over-inflate for a compounding series, so use the variant's own.
+  const eoyReturns = vActive ? vActive.yearly : yearlyReturns(srcMonthly, d.book.base_aum_cr ?? 30)
+  const dispBestMo = vActive ? vActive.summary.best_month_pct : rangeStats.best_month_pct
+  const dispWorstMo = vActive ? vActive.summary.worst_month_pct : rangeStats.worst_month_pct
+  const dispSharpe = vActive ? vActive.summary.sharpe : rangeStats.sharpe
+  const dispWinRate = vActive ? vActive.summary.win_rate : rangeStats.win_rate
 
   // client mix
   const mix = { Institution: 0, HNI: 0, Retail: 0 }
@@ -120,10 +140,13 @@ export default function Dashboard() {
   // Period P&L — current/last month & quarter, from the full monthly series (fixed, not range-dependent).
   // Percentages use the deployed capital (base_aum_cr, ₹30 Cr) — same basis as every other % in the app.
   const baseAumCr = d.book.base_aum_cr ?? 30
-  const monthsAll = d.monthly || []
+  const monthsAll = srcMonthly || []
   const q0 = mo => Math.floor((mo - 1) / 3)                 // 0-based calendar quarter
   const qLabel = (y, q) => `Q${q + 1} '${String(y).slice(2)}`
   const pctOfBase = net => baseAumCr > 0 ? +(net / (baseAumCr * 1e7) * 100).toFixed(2) : 0
+  // Work on a raw monthly-% basis so ₹ and % always reconcile — the compounding BankNifty
+  // variant has NAV-scaled net_inr that would otherwise not match its raw monthly return.
+  const inrOfPct = p => Math.round(p / 100 * baseAumCr * 1e7)
   const periodStat = (() => {
     if (!monthsAll.length) return null
     const last = monthsAll[monthsAll.length - 1]
@@ -131,22 +154,26 @@ export default function Dashboard() {
     const ly = +last.month.slice(0, 4), lm = +last.month.slice(5, 7)
     const cq = { y: ly, q: q0(lm) }
     const lq = cq.q > 0 ? { y: ly, q: cq.q - 1 } : { y: ly - 1, q: 3 }
-    const sumQ = (yy, qq) => monthsAll
+    const sumQpct = (yy, qq) => monthsAll
       .filter(r => +r.month.slice(0, 4) === yy && q0(+r.month.slice(5, 7)) === qq)
-      .reduce((s, r) => s + (r.net_inr || 0), 0)
-    const cqNet = sumQ(cq.y, cq.q), lqNet = sumQ(lq.y, lq.q)
+      .reduce((s, r) => s + (r.pct || 0), 0)
+    const cqPct = +sumQpct(cq.y, cq.q).toFixed(2), lqPct = +sumQpct(lq.y, lq.q).toFixed(2)
+    const mo = r => r ? { month: r.month, pct: r.pct, net_inr: inrOfPct(r.pct) } : null
     return {
-      curMonth: last, lastMonth: prev,
-      cq: { ...cq, net: cqNet, pct: pctOfBase(cqNet) },
-      lq: { ...lq, net: lqNet, pct: pctOfBase(lqNet) },
+      curMonth: mo(last), lastMonth: mo(prev),
+      cq: { ...cq, net: inrOfPct(cqPct), pct: cqPct },
+      lq: { ...lq, net: inrOfPct(lqPct), pct: lqPct },
     }
   })()
-  const totalNetAll = monthsAll.reduce((s, r) => s + (r.net_inr || 0), 0)
-  const pctOnAum = pctOfBase(totalNetAll)
-  const heroAmt = mode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
-  const heroReal = mode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
-  const heroSince = mode === 'overall'
-    ? `${rangeStats.return_pct >= 0 ? '+' : ''}${rangeStats.return_pct}% · ${activeRangeLabel}`
+  // Return on AUM: variants carry the true (compounded) total; otherwise sum the monthly net.
+  const pctOnAum = vActive ? vActive.summary.return_pct
+    : pctOfBase(monthsAll.reduce((s, r) => s + (r.net_inr || 0), 0))
+  // Variants are backtests — no live "today", so force the overall view.
+  const effMode = vActive ? 'overall' : mode
+  const heroAmt = effMode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
+  const heroReal = effMode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
+  const heroSince = effMode === 'overall'
+    ? `${rangeStats.return_pct >= 0 ? '+' : ''}${rangeStats.return_pct}% · ${vActive ? vActive.summary.subtitle : activeRangeLabel}`
     : `last trading day · ${fmtDate(d.hero.today.date)}`
 
   // positions filtered
@@ -219,6 +246,27 @@ export default function Dashboard() {
         <div className="title">Pair Trading — Live Book</div>
         <div className="crumb">Midcap × Nifty · latest trading day {fmtDate(d.latest_date)} · showcasing {showcaseFrom} – {showcaseTo}</div>
 
+        {/* Index / Instrument variant toggle */}
+        <div className="fu" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '10px 0 4px' }}>
+          <div className="chips" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 2 }}>Index</span>
+            {[['combined', 'Combined'], ['nifty', 'NIFTY 50'], ['midcap', 'NIFTY MID SELECT'], ['banknifty', 'BANK NIFTY']].map(([k, label]) => (
+              <button key={k} className={'chip' + (dIndexChip === k ? ' on' : '')} onClick={() => setDIndexChip(k)}>{label}</button>
+            ))}
+          </div>
+          <div className="chips" style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 6 }}>
+            <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 2 }}>Instrument</span>
+            <button className={'chip' + (dInstrMode === 'fut' ? ' on' : '')} onClick={() => setDInstrMode('fut')}>Fut</button>
+            <button className={'chip' + (dInstrMode === 'opt' ? ' on' : '')} onClick={() => setDInstrMode('opt')}>Options</button>
+          </div>
+        </div>
+        {vActive && (
+          <div className="fu" style={{ background: 'color-mix(in srgb, var(--primary) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', borderRadius: 8, padding: '9px 14px', margin: '2px 0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+            <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{vActive.summary.name}</span>
+            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · {vActive.summary.months} mo since {vActive.summary.since} · backtested variant, indicative on ₹{vActive.summary.base_aum_cr} Cr (performance panels only — book &amp; positions stay live)</span>
+          </div>
+        )}
+
         <div className="heroband fu">
           <div className="hcard main">
             <div className="l">Net PnL — Pair Trading <span className="seg2">
@@ -258,8 +306,8 @@ export default function Dashboard() {
               <defs><linearGradient id="gg"><stop offset="0" stopColor="#F97316" /><stop offset="1" stopColor="#38BDF8" /></linearGradient></defs>
             </svg><div className="gv">{book.leverage.toFixed(2)}×</div></div>
             <div className="row2" style={{ marginTop: 8 }}>
-              <Mc l="Sharpe" v={rangeStats.sharpe.toFixed(2)} />
-              <Mc l="Win rate" v={rangeStats.win_rate.toFixed(0) + '%'} />
+              <Mc l="Sharpe" v={dispSharpe.toFixed(2)} />
+              <Mc l="Win rate" v={dispWinRate.toFixed(0) + '%'} />
             </div>
           </div>
         </div>
@@ -276,8 +324,8 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(rangeStats.total_net_inr)}</div>
               <div style={{ display: 'flex', gap: 7 }}>
-                <MiniStat l="Best mo" cls="u" v={(rangeStats.best_month_pct >= 0 ? '+' : '') + rangeStats.best_month_pct.toFixed(2) + '%'} />
-                <MiniStat l="Worst" cls="d" v={(rangeStats.worst_month_pct >= 0 ? '+' : '') + rangeStats.worst_month_pct.toFixed(2) + '%'} />
+                <MiniStat l="Best mo" cls="u" v={(dispBestMo >= 0 ? '+' : '') + dispBestMo.toFixed(2) + '%'} />
+                <MiniStat l="Worst" cls="d" v={(dispWorstMo >= 0 ? '+' : '') + dispWorstMo.toFixed(2) + '%'} />
                 <MiniStat l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(1) + '%'} />
               </div>
             </div>
@@ -543,7 +591,9 @@ function Pencil({ onClick }) {
 function Heatmap({ monthly }) {
   const map = {}
   monthly.forEach(m => { const dt = new Date(m.month); map[`${dt.getUTCFullYear()}-${dt.getUTCMonth() + 1}`] = m.pct })
-  const years = ['2024', '2025', '2026']
+  // Derive years from the data so variants (which span more years) show their full history.
+  const dataYears = [...new Set((monthly || []).map(m => String(m.month).slice(0, 4)))].sort()
+  const years = dataYears.length ? dataYears : ['2024', '2025', '2026']
   return (
     <div className="hm">
       {years.flatMap(y => {

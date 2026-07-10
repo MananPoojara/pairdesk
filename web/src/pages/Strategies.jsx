@@ -29,6 +29,7 @@ import {
   worstDrawdowns,
   yearlyReturns,
 } from '../lib/riskAnalytics'
+import { VARIANTS } from '../lib/variantData'
 import './strategies.css'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -61,9 +62,14 @@ export default function Strategies() {
   if (isError) return <div className="pg-strategies"><div className="shell"><div className="crumb">⚠ API error: {String(error?.message)}</div></div></div>
   if (!data) return <div className="pg-strategies"><div className="shell"><div className="title">Strategies</div><div className="crumb">Loading…</div></div></div>
 
-  const s = data.summary
+  // Variant selection: Options (instrument toggle) or BankNifty (index chip) swap in
+  // hardcoded, verified showcase data; otherwise the live Fut/Combined strategy from the API.
+  const activeVariant = instrMode === 'opt' ? VARIANTS.options
+    : indexChip === 'banknifty' ? VARIANTS.banknifty
+    : null
+  const s = activeVariant ? activeVariant.summary : data.summary
   const pairMaxDd = Number(s.pair_max_dd_pct ?? s.max_dd_pct ?? 0)
-  const monthly = data.monthly
+  const monthly = activeVariant ? activeVariant.monthly : data.monthly
   const presetDates = getDashboardPresetDates(monthly, range === 'Custom' ? 'All' : range, dash?.latest_date)
   const startDate = customStartDate || presetDates.start
   const endDate = customEndDate || presetDates.end
@@ -76,7 +82,8 @@ export default function Strategies() {
   const curveMonthly = strategyStats.monthly
   const chartDomain = equityDomain(startDate, endDate, curveMonthly)
   const liveRows = curveMonthly.map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
-  const backtestRows = buildBacktestRows(dash?.backtest?.series, chartDomain, dash?.backtest?.base_aum_cr ?? 30)
+  // Spot backtest overlay only matches the main Fut strategy — hide it for variants.
+  const backtestRows = activeVariant ? [] : buildBacktestRows(dash?.backtest?.series, chartDomain, dash?.backtest?.base_aum_cr ?? 30)
   const valueDomain = equityValueDomain(liveRows, [])
   const cur = buildDateCurvePath(liveRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const backtestPath = buildDateCurvePath(backtestRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
@@ -94,7 +101,9 @@ export default function Strategies() {
   const riskMetrics = extendedRiskMetrics(curveMonthly, s.aum_cr)
   const worstDrawdownRows = worstDrawdowns(curveMonthly, s.aum_cr, 5)
   const quantileRows = returnQuantiles(curveMonthly, s.aum_cr)
-  const yearRows = yearlyReturns(monthly, s.base_aum_cr ?? 30)
+  // Variants precompute correct per-year (compounded) stats; net_inr-derived yearly over-inflates them.
+  const yearRows = activeVariant ? activeVariant.yearly : yearlyReturns(monthly, s.base_aum_cr ?? 30)
+  const dispSharpe = activeVariant ? s.sharpe : strategyStats.sharpe
   const legSummary = buildLegSummary(curveMonthly, s.aum_cr)
   const legYearRows = buildLegYearRows(monthly, yearRows)
 
@@ -165,9 +174,9 @@ export default function Strategies() {
             <div className="statrow">
               <Sc l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} />
               <Sc l="Return" cls={uD(strategyStats.return_pct)} v={pctS(strategyStats.return_pct)} />
-              <Sc l="Trades" v={rangeTrades} />
+              <Sc l="Trades" v={activeVariant ? s.trades : rangeTrades} />
               <Sc l="Win %" v={strategyStats.win_rate + '%'} />
-              <Sc l="Sharpe" v={strategyStats.sharpe} />
+              <Sc l="Sharpe" v={dispSharpe} />
               <Sc l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
               <Sc l="CAGR" cls="u" v={'~' + s.cagr_pct + '%'} />
             </div>
@@ -191,11 +200,11 @@ export default function Strategies() {
           </div>
         </div>
 
-        {/* variant pending banner — shown when BankNifty or Options selected (uses combined data as stand-in) */}
-        {(indexChip === 'banknifty' || instrMode === 'opt') && (
+        {/* variant banner — real hardcoded showcase data for the selected variant */}
+        {activeVariant && (
           <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
-            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{indexChip === 'banknifty' ? 'BankNifty Variant' : 'Options Variant'}</span>
-            <span style={{ color: 'var(--muted)' }}>Tradesheet pending · showing Combined Pair Trading data as preview — variant-specific stats will update once the sheet is uploaded.</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{s.name}</span>
+            <span style={{ color: 'var(--muted)' }}>{s.subtitle} · {s.months} mo since {s.since} · backtested variant (indicative, on ₹{s.base_aum_cr} Cr base)</span>
           </div>
         )}
 
@@ -275,7 +284,7 @@ export default function Strategies() {
               <Sg l="Gross PnL" cls={uD(rangeGrossInr)} v={fCr(rangeGrossInr / 1e7)} small={(grossRet >= 0 ? '+' : '') + grossRet + '%'} />
               <Sg l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} small={pctS(strategyStats.return_pct)} />
               <Sg l="Win rate" v={strategyStats.win_rate + '%'} small={`${curveMonthly.filter(m => m.net_inr > 0).length}/${curveMonthly.length} mo`} />
-              <Sg l="Sharpe" v={strategyStats.sharpe} />
+              <Sg l="Sharpe" v={dispSharpe} />
               <Sg l="Max drawdown" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
               <Sg l="Exposure" v={`₹${s.exposure_cr.toFixed(1)} Cr`} />
             </div>
@@ -308,13 +317,20 @@ export default function Strategies() {
             <div className="sechd">Year-on-Year <span className="meta">PnL in ₹ &amp; %</span></div>
             <div className="tscroll" style={{ marginTop: 4 }}>
               <table>
-                <thead><tr><th>Year</th><th className="num">Midcap P/L</th><th className="num">NIFTY P/L</th><th className="num">Max DD %</th><th className="num">Sharpe</th></tr></thead>
+                <thead><tr><th>Year</th>
+                  {activeVariant
+                    ? <><th className="num">Net P/L</th><th className="num">Return %</th></>
+                    : <><th className="num">Midcap P/L</th><th className="num">NIFTY P/L</th></>}
+                  <th className="num">Max DD %</th><th className="num">Sharpe</th></tr></thead>
                 <tbody>
                   {legYearRows.map((y, i) => (
                     <tr key={y.year}>
-                      <td>{y.year}{i === data.yearly.length - 1 ? ' YTD' : ''}</td>
-                      <td className={'num m ' + uD(y.midcap_net_inr)}>{fCr(y.midcap_net_inr / 1e7)}</td>
-                      <td className={'num m ' + uD(y.nifty_net_inr)}>{fCr(y.nifty_net_inr / 1e7)}</td>
+                      <td>{y.year}{i === legYearRows.length - 1 ? ' YTD' : ''}</td>
+                      {activeVariant
+                        ? <><td className={'num m ' + uD(y.net_inr)}>{fCr((y.net_inr || 0) / 1e7)}</td>
+                             <td className={'num m ' + uD(y.return_pct)}>{pctS(y.return_pct || 0)}</td></>
+                        : <><td className={'num m ' + uD(y.midcap_net_inr)}>{fCr(y.midcap_net_inr / 1e7)}</td>
+                             <td className={'num m ' + uD(y.nifty_net_inr)}>{fCr(y.nifty_net_inr / 1e7)}</td></>}
                       <td className="num m d">−{y.max_dd_pct}%</td>
                       <td className="num m">{y.sharpe}</td>
                     </tr>
@@ -366,15 +382,17 @@ export default function Strategies() {
               <tbody>
                 <Cmp l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} />
                 <Cmp l="Return %" cls={uD(strategyStats.return_pct)} v={pctS(strategyStats.return_pct)} />
-                <Cmp l="Midcap P/L" cls={uD(legSummary.midcap.net_inr)} v={fCr(legSummary.midcap.net_inr / 1e7)} />
-                <Cmp l="Midcap P/L %" cls={uD(legSummary.midcap.pct)} v={pctS(legSummary.midcap.pct)} />
-                <Cmp l="NIFTY P/L" cls={uD(legSummary.nifty.net_inr)} v={fCr(legSummary.nifty.net_inr / 1e7)} />
-                <Cmp l="NIFTY P/L %" cls={uD(legSummary.nifty.pct)} v={pctS(legSummary.nifty.pct)} />
-                <Cmp l="Combined P/L" cls={uD(legSummary.combined.net_inr)} v={fCr(legSummary.combined.net_inr / 1e7)} />
-                <Cmp l="Combined P/L %" cls={uD(legSummary.combined.pct)} v={pctS(legSummary.combined.pct)} />
-                <Cmp l="Trades" v={rangeTrades} />
+                {!activeVariant && <>
+                  <Cmp l="Midcap P/L" cls={uD(legSummary.midcap.net_inr)} v={fCr(legSummary.midcap.net_inr / 1e7)} />
+                  <Cmp l="Midcap P/L %" cls={uD(legSummary.midcap.pct)} v={pctS(legSummary.midcap.pct)} />
+                  <Cmp l="NIFTY P/L" cls={uD(legSummary.nifty.net_inr)} v={fCr(legSummary.nifty.net_inr / 1e7)} />
+                  <Cmp l="NIFTY P/L %" cls={uD(legSummary.nifty.pct)} v={pctS(legSummary.nifty.pct)} />
+                  <Cmp l="Combined P/L" cls={uD(legSummary.combined.net_inr)} v={fCr(legSummary.combined.net_inr / 1e7)} />
+                  <Cmp l="Combined P/L %" cls={uD(legSummary.combined.pct)} v={pctS(legSummary.combined.pct)} />
+                </>}
+                <Cmp l="Trades" v={activeVariant ? s.trades : rangeTrades} />
                 <Cmp l="Win %" v={strategyStats.win_rate + '%'} />
-                <Cmp l="Sharpe" v={strategyStats.sharpe} />
+                <Cmp l="Sharpe" v={dispSharpe} />
                 <Cmp l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
                 <Cmp l="CAGR" cls="u" v={'~' + riskMetrics.cagr_pct + '%'} />
               </tbody>
