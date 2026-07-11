@@ -124,3 +124,17 @@ tbody td{padding:11px 13px;border-bottom:1px solid #F4ECDF}tbody tr:hover{backgr
 .todaytile .cell .l .per{text-transform:none;color:var(--muted);font-weight:600;margin-left:5px}
 .pg-dash .chip:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
 .pg-dash .chip:disabled:hover{border-color:var(--line);color:#6b6457}
+
+/* Period P&L compact table */
+.pdl-tile{grid-row:span 3;display:flex;flex-direction:column}
+.pdl-table{width:100%;border-collapse:collapse;margin-top:6px;flex:1}
+.pdl-table th{text-align:right;font-size:9px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 12px 7px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+.pdl-table th:first-child{text-align:left}
+.pdl-table td{padding:13px 12px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono';font-weight:600;font-size:13px;text-align:right;white-space:nowrap}
+.pdl-table tbody tr:last-child td{border-bottom:none}
+.pdl-table td.pdl-p{text-align:left;font-family:inherit;width:24%}
+.pdl-table td.pdl-p b{font-weight:700;font-size:13.5px;display:block}
+.pdl-table .pdl-sub{display:block;font-size:10px;color:var(--muted);font-weight:600;margin-top:2px;font-family:'JetBrains Mono'}
+.pdl-table td.u{color:var(--pos)}
+.pdl-table td.d{color:var(--neg)}
+.pdl-table tbody tr:hover{background:var(--soft)}

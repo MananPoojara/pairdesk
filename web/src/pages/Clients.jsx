@@ -597,8 +597,10 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
   const [showBacktest, setShowBacktest] = useState(true)
   const domain = equityDomain(monthly?.[0]?.month, monthly?.[monthly.length - 1]?.month, monthly)
   const liveRows = (monthly || []).map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
-  const backtestRows = buildBacktestRows(backtest, domain, backtestBaseAum ?? 30)
-  const valueDomain = equityValueDomain(liveRows, [])
+  // Scale the spot backtest to THIS client's allocation (same scale as the live curve),
+  // and include it in the value domain so it never overflows the panel.
+  const backtestRows = buildBacktestRows(backtest, domain, allocationCr || backtestBaseAum || 30)
+  const valueDomain = equityValueDomain(liveRows, backtestRows)
   const livePath = buildDateCurvePath(liveRows, domain, valueDomain, CURVE_W, CURVE_H, CURVE_PAD)
   const livePts = dateLinePoints(liveRows, domain, valueDomain, CURVE_W, CURVE_H, CURVE_PAD)
   const backtestPath = buildDateCurvePath(backtestRows, domain, valueDomain, CURVE_W, CURVE_H, CURVE_PAD)
@@ -609,8 +611,16 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
 
   const foot = (() => {
     if (!monthly.length) return []
-    const step = Math.max(1, Math.ceil(monthly.length / 10))
-    return monthly.filter((_, i) => i % step === 0 || i === monthly.length - 1).map(m => fMonSh(m.month))
+    // ~6 evenly spaced labels; replace (not append) the final tick if it's adjacent, to avoid crowding
+    const step = Math.max(1, Math.ceil((monthly.length - 1) / 5))
+    const idx = []
+    for (let i = 0; i < monthly.length; i += step) idx.push(i)
+    const last = monthly.length - 1
+    if (idx[idx.length - 1] !== last) {
+      if (last - idx[idx.length - 1] <= step / 2) idx[idx.length - 1] = last
+      else idx.push(last)
+    }
+    return idx.map(i => fMonSh(monthly[i].month))
   })()
 
   function onMove(e) {
@@ -679,7 +689,7 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
         </div>
       )}
       <div className="curve-foot">
-        {foot.map((f, i) => <span key={i}>{f}</span>)}
+        <div className="cf-ticks">{foot.map((f, i) => <span key={i}>{f}</span>)}</div>
         {showBacktest && <span className="bt-foot">Spot backtest</span>}
       </div>
     </div>

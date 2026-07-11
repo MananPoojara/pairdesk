@@ -59,8 +59,9 @@
 /* Pair-level combined P/L & % — merged once across both legs of a pair */
 .pg-clients .pair-cell{border-left:1px solid var(--line);background:#FCFAF6}
 .pg-clients .curve-svg {width:100%;height:190px;display:block;overflow:visible;cursor:crosshair}
-.pg-clients .curve-foot {display:flex;justify-content:space-between;padding:5px 0 14px;font-size:9px;color:var(--muted);font-weight:600}
-.pg-clients .curve-foot .bt-foot{margin-left:auto;color:var(--primary);font-weight:800}
+.pg-clients .curve-foot {display:flex;align-items:baseline;gap:12px;padding:5px 0 14px;font-size:9px;color:var(--muted);font-weight:600}
+.pg-clients .curve-foot .cf-ticks{flex:1;display:flex;justify-content:space-between}
+.pg-clients .curve-foot .bt-foot{color:var(--primary);font-weight:800;white-space:nowrap}
 .pg-clients /* curve hover tooltip */
 .crv-tip {position:absolute;z-index:5;pointer-events:none;background:#0F1B2D;color:#fff;border-radius:9px;padding:8px 11px;min-width:118px;box-shadow:0 10px 28px -10px rgba(15,27,45,.55);opacity:0;transition:opacity .12s;transform:translateZ(0)}
 .pg-clients .crv-tip .tt-mo {font-family:'Familjen Grotesk';font-weight:700;font-size:12px;margin-bottom:5px;letter-spacing:.02em}

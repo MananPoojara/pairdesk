@@ -46,6 +46,7 @@ export async function dashboardHandler(req, reply) {
     WITH m AS (
       SELECT
         to_char(date_trunc('month', t.trade_date), 'YYYY-MM-01') AS month,
+        COUNT(*) AS trades,
         SUM(
           CASE WHEN t.direction='LONG'
                THEN (t.exit_price  - t.entry_price) * t.lots * t.lot_size
@@ -273,6 +274,7 @@ export async function dashboardHandler(req, reply) {
       month:          m.month,
       gross_inr:      Math.round(+m.gross_inr),
       charges_inr:    Math.round(+m.charges_inr),
+      trades:         +m.trades,
       net_inr:        Math.round(+m.net_inr),
       midcap_net_inr: Math.round(+m.midcap_net_inr),
       nifty_net_inr:  Math.round(+m.nifty_net_inr),

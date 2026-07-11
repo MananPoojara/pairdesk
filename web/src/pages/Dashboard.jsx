@@ -28,7 +28,7 @@ const CATCOLOR = { Institution: '#0EA5E9', HNI: '#38BDF8', Retail: '#F97316' }
 const CATCLS = { Institution: 'inst', HNI: 'hni', Retail: 'retail' }
 const IDX = ['All Indices', 'NIFTY 50', 'NIFTY MIDCAP SELECT', 'Combined (pair)']
 const EQ_W = 700
-const EQ_H = 80
+const EQ_H = 104
 const EQ_PAD = 8
 
 export default function Dashboard() {
@@ -159,15 +159,15 @@ export default function Dashboard() {
     const ly = +last.month.slice(0, 4), lm = +last.month.slice(5, 7)
     const cq = { y: ly, q: q0(lm) }
     const lq = cq.q > 0 ? { y: ly, q: cq.q - 1 } : { y: ly - 1, q: 3 }
-    const sumQpct = (yy, qq) => monthsAll
-      .filter(r => +r.month.slice(0, 4) === yy && q0(+r.month.slice(5, 7)) === qq)
-      .reduce((s, r) => s + (r.pct || 0), 0)
+    const inQ = (r, yy, qq) => +r.month.slice(0, 4) === yy && q0(+r.month.slice(5, 7)) === qq
+    const sumQpct = (yy, qq) => monthsAll.filter(r => inQ(r, yy, qq)).reduce((s, r) => s + (r.pct || 0), 0)
+    const sumQtr = (yy, qq) => monthsAll.filter(r => inQ(r, yy, qq)).reduce((s, r) => s + (r.trades || 0), 0)
     const cqPct = +sumQpct(cq.y, cq.q).toFixed(2), lqPct = +sumQpct(lq.y, lq.q).toFixed(2)
-    const mo = r => r ? { month: r.month, pct: r.pct, net_inr: inrOfPct(r.pct) } : null
+    const mo = r => r ? { month: r.month, pct: r.pct, net_inr: inrOfPct(r.pct), trades: r.trades || 0 } : null
     return {
       curMonth: mo(last), lastMonth: mo(prev),
-      cq: { ...cq, net: inrOfPct(cqPct), pct: cqPct },
-      lq: { ...lq, net: inrOfPct(lqPct), pct: lqPct },
+      cq: { ...cq, net: inrOfPct(cqPct), pct: cqPct, trades: sumQtr(cq.y, cq.q) },
+      lq: { ...lq, net: inrOfPct(lqPct), pct: lqPct, trades: sumQtr(lq.y, lq.q) },
     }
   })()
   // Return on AUM: variants carry the true (compounded) total; otherwise sum the monthly net.
@@ -326,7 +326,7 @@ export default function Dashboard() {
 
         <div className="bento">
           {/* Equity curve */}
-          <div className="t c7 r2 flexcol fu equity-card">
+          <div className="t c7 r3 flexcol fu equity-card">
             <div className="l eq-head">
               <span>Equity Curve <span className="meta">net realised · monthly</span></span>
               <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
@@ -392,7 +392,7 @@ export default function Dashboard() {
           </div>
 
           {/* Yearly returns */}
-          <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.04s' }}>
+          <div className="t c5 r3 flexcol fu" style={{ animationDelay: '.04s' }}>
             <div className="l">Yearly Return <span className="meta">calendar year · net</span></div>
             <EoyBars data={eoyReturns} />
           </div>
@@ -459,21 +459,44 @@ export default function Dashboard() {
               <Cell l="Realised" v={fmtInr(d.hero.today.realised_inr)} />
               <Cell l="Unrealised" v="₹0" />
               <Cell l="Trades" v={d.hero.today.trades ?? pos.length} />
-              <Cell l="Exposure" v={fmtCr(book.exposure_cr)} />
-              <Cell l="Margin" v={fmtCr(book.aum_cr * 0.25)} />
+              <Cell l="Exposure" v={fmtCr(baseAumCr)} />
+              <Cell l="Margin" v={fmtCr(baseAumCr * 0.25)} />
             </div>
           </div>
 
-          {/* Period P&L */}
+          {/* Period P&L — compact stats table */}
           {periodStat && (
-            <div className="t c12 todaytile fu">
-              <div className="hd"><b><span className="dot"></span>Period P&amp;L</b><span>net realised · month &amp; quarter</span></div>
-              <div className="cells" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-                <PCell l="Current Month" sub={fmtMonYr(periodStat.curMonth.month)} inr={periodStat.curMonth.net_inr} pct={periodStat.curMonth.pct} />
-                <PCell l="Last Month" sub={periodStat.lastMonth ? fmtMonYr(periodStat.lastMonth.month) : '—'} inr={periodStat.lastMonth ? periodStat.lastMonth.net_inr : null} pct={periodStat.lastMonth ? periodStat.lastMonth.pct : null} />
-                <PCell l="Current Quarter" sub={qLabel(periodStat.cq.y, periodStat.cq.q)} inr={periodStat.cq.net} pct={periodStat.cq.pct} />
-                <PCell l="Last Quarter" sub={qLabel(periodStat.lq.y, periodStat.lq.q)} inr={periodStat.lq.net} pct={periodStat.lq.pct} />
-              </div>
+            <div className="t c12 fu pdl-tile">
+              <div className="l">Period P&amp;L <span className="meta">net = realised + unrealised on live open leg · deployed ₹{baseAumCr} Cr</span></div>
+              <table className="pdl-table">
+                <thead><tr>
+                  <th>Period</th><th className="num">Net PnL</th><th className="num">Realised</th><th className="num">Unrealised</th><th className="num">Trades</th><th className="num">Exposure</th><th className="num">Margin</th>
+                </tr></thead>
+                <tbody>
+                  {[
+                    { label: 'Current Month', sub: fmtMonYr(periodStat.curMonth.month), p: periodStat.curMonth, unreal: totalUnreal },
+                    { label: 'Last Month', sub: periodStat.lastMonth ? fmtMonYr(periodStat.lastMonth.month) : '—', p: periodStat.lastMonth, unreal: 0 },
+                    { label: 'Current Quarter', sub: qLabel(periodStat.cq.y, periodStat.cq.q), p: periodStat.cq, unreal: totalUnreal },
+                    { label: 'Last Quarter', sub: qLabel(periodStat.lq.y, periodStat.lq.q), p: periodStat.lq, unreal: 0 },
+                  ].map(row => {
+                    const realised = row.p ? (row.p.net_inr ?? row.p.net) : null
+                    const net = realised == null ? null : realised + (row.unreal || 0)
+                    const pct = realised == null ? null : pctOfBase(net)
+                    const trades = row.p ? (row.p.trades ?? 0) : 0
+                    return (
+                      <tr key={row.label}>
+                        <td className="pdl-p"><b>{row.label}</b><span className="pdl-sub">{row.sub}{pct != null ? ` · ${(pct >= 0 ? '+' : '') + pct.toFixed(2)}%` : ''}</span></td>
+                        <td className={'num ' + (net == null ? '' : net >= 0 ? 'u' : 'd')}>{net == null ? '—' : fmtInr(net)}</td>
+                        <td className={'num ' + (realised == null ? '' : realised >= 0 ? 'u' : 'd')}>{realised == null ? '—' : fmtInr(realised)}</td>
+                        <td className={'num ' + (row.unreal ? (row.unreal >= 0 ? 'u' : 'd') : '')}>{row.unreal ? fmtInr(row.unreal) : '₹0'}</td>
+                        <td className="num">{trades}</td>
+                        <td className="num">{fmtCr(baseAumCr)}</td>
+                        <td className="num">{fmtCr(baseAumCr * 0.25)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
 
