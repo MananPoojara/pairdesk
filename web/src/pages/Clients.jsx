@@ -656,9 +656,9 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
     <div className="curve-wrap" ref={wrapRef}>
       <div className="curve-lbl">
         <span>Equity Curve · cumulative net PnL · Midcap × Nifty Pair Trade</span>
-        <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
+        {backtestRows.length > 0 && <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
           <span></span>Backtest
-        </button>
+        </button>}
       </div>
       <svg className="curve-svg" viewBox={`0 0 ${CURVE_W} ${CURVE_H}`} preserveAspectRatio="none" ref={svgRef}>
         <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
@@ -690,7 +690,7 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
       )}
       <div className="curve-foot">
         <div className="cf-ticks">{foot.map((f, i) => <span key={i}>{f}</span>)}</div>
-        {showBacktest && <span className="bt-foot">Spot backtest</span>}
+        {showBacktest && backtestRows.length > 0 && <span className="bt-foot">Spot backtest</span>}
       </div>
     </div>
   )

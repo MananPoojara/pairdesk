@@ -175,7 +175,7 @@ export default function Strategies() {
           <div className="panel scard">
             <div className="hd">
               <div><div className="nm">{s.name}</div><div className="st">{s.subtitle}</div></div>
-              <span className="badge act">● Active</span>
+              <span className={'badge ' + (activeVariant || legFilter ? 'soon' : 'act')}>{activeVariant ? '◔ Spot-backtested' : legFilter ? '◔ Indicative' : '● Active'}</span>
             </div>
             <div className="statrow">
               <Sc l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} />
@@ -226,10 +226,10 @@ export default function Strategies() {
           <div className="panel c8 flexcol" style={{ padding: '16px 18px' }}>
             <div className="t-l" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <b style={{ fontFamily: "'Familjen Grotesk'", fontWeight: 700, fontSize: 16, marginRight: 'auto' }}>Pair Trading — Equity Curve</b>
-              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>cumulative net PnL · monthly EOD</span>
-              <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{activeVariant ? 'spot-backtested · monthly EOD' : legFilter ? 'indicative leg · monthly EOD' : 'cumulative net PnL · monthly EOD'}</span>
+              {!(activeVariant || legFilter) && <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
                 <span></span>Backtest
-              </button>
+              </button>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 12 }}>
               <div className={'m ' + uD(strategyStats.total_net_inr)} style={{ fontSize: 26, fontWeight: 600 }}>{fCr(strategyStats.total_net_inr / 1e7)} <span style={{ fontSize: 14 }}>/ {pctS(strategyStats.return_pct)}</span></div>
@@ -284,8 +284,8 @@ export default function Strategies() {
               </div>
             </div>
             <div className="legend">
-              <span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL (realised)</span>
-              {showBacktest && <span><i style={{ background: '#F97316' }}></i>Spot backtest</span>}
+              <span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL ({activeVariant ? 'spot-backtested' : legFilter ? 'indicative leg' : 'realised'})</span>
+              {showBacktest && backtestRows.length > 0 && <span><i style={{ background: '#F97316' }}></i>Spot backtest</span>}
             </div>
           </div>
 
