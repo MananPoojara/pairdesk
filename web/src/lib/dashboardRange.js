@@ -2,6 +2,20 @@ import { maxDrawdownPct } from './riskAnalytics.js'
 
 export const DASHBOARD_RANGE_MONTHS = { '1M': 1, '3M': 3, '1Y': 12, All: 9999 }
 
+// Project the monthly series onto a single leg of the pair (nifty | midcap).
+// Reuses the per-leg fields the API already returns (nifty_net_inr/nifty_pct, etc.)
+// so the whole page (curve, heatmap, yearly, stats) renders that leg's P&L only.
+export function legMonthly(monthly, leg) {
+  const netKey = leg === 'nifty' ? 'nifty_net_inr' : 'midcap_net_inr'
+  const pctKey = leg === 'nifty' ? 'nifty_pct' : 'midcap_pct'
+  let cum = 0
+  return (monthly || []).map(row => {
+    const net = Number(row[netKey]) || 0
+    cum += net
+    return { ...row, net_inr: net, gross_inr: net, cumulative_inr: cum, pct: Number(row[pctKey]) || 0 }
+  })
+}
+
 export function monthKey(date) {
   return String(date || '').slice(0, 7)
 }

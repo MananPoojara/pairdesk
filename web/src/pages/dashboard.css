@@ -122,3 +122,5 @@ tbody td{padding:11px 13px;border-bottom:1px solid #F4ECDF}tbody tr:hover{backgr
 /* Period P&L cell: period + % sub-line, keeps the same 6-column todaytile look as Latest Day */
 .todaytile .cell .sub{font-size:10px;font-weight:700;margin-top:2px;font-family:'JetBrains Mono';letter-spacing:-.02em}
 .todaytile .cell .l .per{text-transform:none;color:var(--muted);font-weight:600;margin-left:5px}
+.pg-dash .chip:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
+.pg-dash .chip:disabled:hover{border-color:var(--line);color:#6b6457}

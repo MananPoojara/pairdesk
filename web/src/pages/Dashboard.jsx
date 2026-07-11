@@ -9,6 +9,7 @@ import {
   firstMonthlyDate,
   getDashboardPresetDates,
   lastMonthlyDate,
+  legMonthly,
   selectDashboardDateRange,
   selectDashboardRange,
 } from '../lib/dashboardRange'
@@ -20,7 +21,7 @@ import {
   equityValueDomain,
   timelineTicks,
 } from '../lib/equityBacktest'
-import { yearlyReturns } from '../lib/riskAnalytics'
+import { capitalMaxDrawdownPct, yearlyReturns } from '../lib/riskAnalytics'
 import { VARIANTS } from '../lib/variantData'
 
 const CATCOLOR = { Institution: '#0EA5E9', HNI: '#38BDF8', Retail: '#F97316' }
@@ -68,7 +69,10 @@ export default function Dashboard() {
   const vActive = dInstrMode === 'opt' ? VARIANTS.options
     : dIndexChip === 'banknifty' ? VARIANTS.banknifty
     : null
-  const srcMonthly = vActive ? vActive.monthly : d.monthly
+  // Fut + Nifty/Midcap chip → show that leg of the pair only (options disables the index chips).
+  const legFilter = (dInstrMode === 'fut' && (dIndexChip === 'nifty' || dIndexChip === 'midcap')) ? dIndexChip : null
+  const legLabel = legFilter === 'nifty' ? 'NIFTY 50 leg' : legFilter === 'midcap' ? 'NIFTY Midcap Select leg' : null
+  const srcMonthly = vActive ? vActive.monthly : legFilter ? legMonthly(d.monthly, legFilter) : d.monthly
   const perfLatest = vActive ? srcMonthly[srcMonthly.length - 1].month : d.latest_date
 
   const presetDates = getDashboardPresetDates(srcMonthly, range === 'Custom' ? 'All' : range, perfLatest)
@@ -81,13 +85,14 @@ export default function Dashboard() {
     : selectDashboardRange(srcMonthly, range)
   const rangeStats = buildDashboardRangeStats(selectedMonthly, d.book.base_aum_cr ?? 30)
   const pairMaxDd = vActive ? Number(vActive.summary.pair_max_dd_pct)
+    : legFilter ? capitalMaxDrawdownPct(rangeStats.monthly, d.book.base_aum_cr ?? 30)
     : Number(d.stats?.pair_max_dd_pct ?? d.stats?.max_dd_pct ?? rangeStats.max_dd_pct)
   const curveMonthly = rangeStats.monthly
   const heroPath = buildCurvePath(curveMonthly, 560, 70, 4)
   const chartDomain = equityDomain(startDate, endDate, curveMonthly)
   const liveRows = curveMonthly.map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
-  // Spot backtest overlay only matches the main Fut strategy — hide it for variants.
-  const backtestRows = vActive ? [] : buildBacktestRows(d.backtest?.series, chartDomain, d.backtest?.base_aum_cr ?? 30)
+  // Spot backtest overlay only matches the main combined Fut strategy — hide it for variants and leg views.
+  const backtestRows = (vActive || legFilter) ? [] : buildBacktestRows(d.backtest?.series, chartDomain, d.backtest?.base_aum_cr ?? 30)
   const valueDomain = equityValueDomain(liveRows, [])
   const eqPath = buildDateCurvePath(liveRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const backtestPath = buildDateCurvePath(backtestRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
@@ -168,12 +173,12 @@ export default function Dashboard() {
   // Return on AUM: variants carry the true (compounded) total; otherwise sum the monthly net.
   const pctOnAum = vActive ? vActive.summary.return_pct
     : pctOfBase(monthsAll.reduce((s, r) => s + (r.net_inr || 0), 0))
-  // Variants are backtests — no live "today", so force the overall view.
-  const effMode = vActive ? 'overall' : mode
+  // Variants/leg views have no live "today" number, so force the overall view.
+  const effMode = (vActive || legFilter) ? 'overall' : mode
   const heroAmt = effMode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
   const heroReal = effMode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
   const heroSince = effMode === 'overall'
-    ? `${rangeStats.return_pct >= 0 ? '+' : ''}${rangeStats.return_pct}% · ${vActive ? vActive.summary.subtitle : activeRangeLabel}`
+    ? `${rangeStats.return_pct >= 0 ? '+' : ''}${rangeStats.return_pct}% · ${vActive ? vActive.summary.subtitle : legFilter ? legLabel + ' only' : activeRangeLabel}`
     : `last trading day · ${fmtDate(d.hero.today.date)}`
 
   // positions filtered
@@ -251,7 +256,8 @@ export default function Dashboard() {
           <div className="chips" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 2 }}>Index</span>
             {[['combined', 'Combined'], ['nifty', 'NIFTY 50'], ['midcap', 'NIFTY MID SELECT'], ['banknifty', 'BANK NIFTY']].map(([k, label]) => (
-              <button key={k} className={'chip' + (dIndexChip === k ? ' on' : '')} onClick={() => setDIndexChip(k)}>{label}</button>
+              <button key={k} disabled={dInstrMode === 'opt'} className={'chip' + (dIndexChip === k ? ' on' : '')}
+                onClick={() => dInstrMode !== 'opt' && setDIndexChip(k)}>{label}</button>
             ))}
           </div>
           <div className="chips" style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 6 }}>
@@ -264,6 +270,12 @@ export default function Dashboard() {
           <div className="fu" style={{ background: 'color-mix(in srgb, var(--primary) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', borderRadius: 8, padding: '9px 14px', margin: '2px 0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
             <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{vActive.summary.name}</span>
             <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · {vActive.summary.months} mo since {vActive.summary.since} · backtested variant, indicative on ₹{vActive.summary.base_aum_cr} Cr (performance panels only — book &amp; positions stay live)</span>
+          </div>
+        )}
+        {legFilter && (
+          <div className="fu" style={{ background: 'color-mix(in srgb, var(--accent) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)', borderRadius: 8, padding: '9px 14px', margin: '2px 0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{legLabel} only</span>
+            <span style={{ color: 'var(--muted)' }}>Showing the {legFilter === 'nifty' ? 'Nifty' : 'Midcap'} leg's P&amp;L of the pair — performance panels only; book &amp; positions stay live.</span>
           </div>
         )}
 

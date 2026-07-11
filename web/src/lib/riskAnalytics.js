@@ -94,6 +94,14 @@ export function maxDrawdownPct(monthly, capitalCr) {
   return +Math.abs(Math.min(...series.map(row => row.drawdown_pct))).toFixed(2)
 }
 
+// Capital-based max drawdown: equity starts from capitalCr (not 0), so a single
+// leg whose cumulative dips negative early doesn't blow up to a nonsense −100%+.
+export function capitalMaxDrawdownPct(monthly, capitalCr) {
+  const series = buildCapitalDrawdownSeries(monthly, capitalCr)
+  if (!series.length) return 0
+  return +Math.abs(Math.min(...series.map(row => row.drawdown_pct))).toFixed(2)
+}
+
 export function rollingSharpe(monthly, capitalCr, window = 12) {
   const returns = monthlyReturns(monthly, capitalCr)
   const rows = monthly || []

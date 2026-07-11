@@ -10,6 +10,7 @@ import {
   firstMonthlyDate,
   getDashboardPresetDates,
   lastMonthlyDate,
+  legMonthly,
   selectDashboardDateRange,
   selectDashboardRange,
 } from '../lib/dashboardRange'
@@ -23,6 +24,7 @@ import {
 } from '../lib/equityBacktest'
 import {
   buildCapitalDrawdownSeries,
+  capitalMaxDrawdownPct,
   extendedRiskMetrics,
   returnQuantiles,
   rollingSharpe,
@@ -67,9 +69,11 @@ export default function Strategies() {
   const activeVariant = instrMode === 'opt' ? VARIANTS.options
     : indexChip === 'banknifty' ? VARIANTS.banknifty
     : null
+  // Fut + Nifty/Midcap chip → show that leg of the pair only (options disables the index chips).
+  const legFilter = (instrMode === 'fut' && (indexChip === 'nifty' || indexChip === 'midcap')) ? indexChip : null
+  const legLabel = legFilter === 'nifty' ? 'NIFTY 50 leg' : legFilter === 'midcap' ? 'NIFTY Midcap Select leg' : null
   const s = activeVariant ? activeVariant.summary : data.summary
-  const pairMaxDd = Number(s.pair_max_dd_pct ?? s.max_dd_pct ?? 0)
-  const monthly = activeVariant ? activeVariant.monthly : data.monthly
+  const monthly = activeVariant ? activeVariant.monthly : legFilter ? legMonthly(data.monthly, legFilter) : data.monthly
   const presetDates = getDashboardPresetDates(monthly, range === 'Custom' ? 'All' : range, dash?.latest_date)
   const startDate = customStartDate || presetDates.start
   const endDate = customEndDate || presetDates.end
@@ -79,11 +83,13 @@ export default function Strategies() {
     ? selectDashboardDateRange(monthly, startDate, endDate)
     : selectDashboardRange(monthly, range)
   const strategyStats = buildDashboardRangeStats(selectedMonthly, s.base_aum_cr ?? 30)
+  // Leg views use the leg's own drawdown; variants/combined use the pair reference DD.
+  const pairMaxDd = legFilter ? capitalMaxDrawdownPct(strategyStats.monthly, s.base_aum_cr ?? 30) : Number(s.pair_max_dd_pct ?? s.max_dd_pct ?? 0)
   const curveMonthly = strategyStats.monthly
   const chartDomain = equityDomain(startDate, endDate, curveMonthly)
   const liveRows = curveMonthly.map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
-  // Spot backtest overlay only matches the main Fut strategy — hide it for variants.
-  const backtestRows = activeVariant ? [] : buildBacktestRows(dash?.backtest?.series, chartDomain, dash?.backtest?.base_aum_cr ?? 30)
+  // Spot backtest overlay only matches the main combined Fut strategy — hide for variants and leg views.
+  const backtestRows = (activeVariant || legFilter) ? [] : buildBacktestRows(dash?.backtest?.series, chartDomain, dash?.backtest?.base_aum_cr ?? 30)
   const valueDomain = equityValueDomain(liveRows, [])
   const cur = buildDateCurvePath(liveRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
   const backtestPath = buildDateCurvePath(backtestRows, chartDomain, valueDomain, EQ_W, EQ_H, EQ_PAD)
@@ -151,10 +157,10 @@ export default function Strategies() {
           <div className="controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
             <div className="chips">
               <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 4 }}>Index</span>
-              <button className={'chip' + (indexChip === 'combined' ? ' on' : '')} onClick={() => setIndexChip('combined')}>Combined</button>
-              <button className={'chip' + (indexChip === 'nifty' ? ' on' : '')} onClick={() => setIndexChip('nifty')}>NIFTY 50</button>
-              <button className={'chip' + (indexChip === 'midcap' ? ' on' : '')} onClick={() => setIndexChip('midcap')}>NIFTY MID SELECT</button>
-              <button className={'chip' + (indexChip === 'banknifty' ? ' on' : '')} onClick={() => setIndexChip('banknifty')}>BANK NIFTY</button>
+              {[['combined', 'Combined'], ['nifty', 'NIFTY 50'], ['midcap', 'NIFTY MID SELECT'], ['banknifty', 'BANK NIFTY']].map(([k, label]) => (
+                <button key={k} disabled={instrMode === 'opt'} className={'chip' + (indexChip === k ? ' on' : '')}
+                  onClick={() => instrMode !== 'opt' && setIndexChip(k)}>{label}</button>
+              ))}
             </div>
             <div className="chips">
               <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 4 }}>Instrument</span>
@@ -205,6 +211,12 @@ export default function Strategies() {
           <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
             <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{s.name}</span>
             <span style={{ color: 'var(--muted)' }}>{s.subtitle} · {s.months} mo since {s.since} · backtested variant (indicative, on ₹{s.base_aum_cr} Cr base)</span>
+          </div>
+        )}
+        {legFilter && (
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{legLabel} only</span>
+            <span style={{ color: 'var(--muted)' }}>Showing the {legFilter === 'nifty' ? 'Nifty' : 'Midcap'} leg's P&amp;L of the pair (the other leg excluded).</span>
           </div>
         )}
 

@@ -114,3 +114,4 @@
 .pg-strategies .quant-chart .qa-svg{height:240px}
 .pg-strategies .quant-y{font-family:'JetBrains Mono';font-size:11px;font-weight:800;fill:#6b6457}
 .pg-strategies .quant-label{font-family:'Plus Jakarta Sans';font-size:12px;font-weight:800;fill:#6b6457}
+.pg-strategies .chip:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
