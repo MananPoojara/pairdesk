@@ -102,7 +102,7 @@ export async function strategiesHandler(req, reply) {
   return {
     summary: {
       name: 'Pair Trading',
-      subtitle: 'Midcap × Nifty · futures (spot-backtested)',
+      subtitle: 'Midcap × Nifty · futures pair',
       active: true,
       net_inr: Math.round(totalNet), net_cr: +(totalNet / 1e7).toFixed(2),
       gross_inr: Math.round(grossTotal), gross_cr: +(grossTotal / 1e7).toFixed(2),
