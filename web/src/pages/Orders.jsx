@@ -38,9 +38,14 @@ export default function Orders() {
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [q, setQ] = useState('')
+  const [client, setClient] = useState('all')
   const [expanded, setExpanded] = useState(null)
 
   const all = data?.trades || []
+  // Unique clients that have orders (for the client filter), sorted by name.
+  const clients = Array.from(
+    new Map(all.map(t => [t.client_code, { code: t.client_code, name: t.client_name, category: t.category }])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name))
   const tradeDates = all.map(t => t.date).filter(Boolean).sort()
   const minDate = tradeDates[0] || ''
   const maxDate = tradeDates[tradeDates.length - 1] || ''
@@ -50,6 +55,7 @@ export default function Orders() {
   const trades = all.filter(t => {
     // Blotter is closed/settled trades (open positions live on the Dashboard).
     if (mode === 'open') return false
+    if (client !== 'all' && t.client_code !== client) return false
     if (startDate && t.date < startDate) return false
     if (endDate && t.date > endDate) return false
     if (side !== 'all' && t.direction.toLowerCase() !== side) return false
@@ -155,6 +161,10 @@ export default function Orders() {
         </div>
 
         <div className="filterrow fu">
+          <select className="client-sel" value={client} onChange={e => { setClient(e.target.value); setExpanded(null) }}>
+            <option value="all">All clients ({clients.length})</option>
+            {clients.map(c => <option key={c.code} value={c.code}>{c.name} · {c.category}</option>)}
+          </select>
           <input className="srch-inp" placeholder="⌕ Search by symbol, client, contract…" value={q} onChange={e => { setQ(e.target.value); setExpanded(null) }} />
           <Seg val={regime} on={v => { setRegime(v); setExpanded(null) }} opts={[{ v: 'all', label: 'All regimes' }, { v: 'BULL', label: 'Bull' }, { v: 'BEAR', label: 'Bear' }]} />
         </div>

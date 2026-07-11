@@ -4,6 +4,8 @@
 .pg-orders .filterrow .srch-inp {flex:1;min-width:220px;border:1.5px solid var(--line);border-radius:10px;padding:8px 13px;font-family:inherit;font-size:13px;font-weight:600;outline:none;background:#fff}
 .pg-orders .filterrow .srch-inp:focus {border-color:var(--primary)}
 .pg-orders .filterrow .srch-inp::placeholder {color:var(--muted)}
+.pg-orders .filterrow .client-sel {border:1.5px solid var(--line);border-radius:10px;padding:8px 32px 8px 13px;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);outline:none;cursor:pointer;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%239C9384' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right 11px center;-webkit-appearance:none;appearance:none;max-width:260px}
+.pg-orders .filterrow .client-sel:focus {border-color:var(--primary)}
 .pg-orders /* KPI ribbon */
 .kribbon {display:grid;gap:14px;margin-bottom:14px}
 .pg-orders .kr {background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 17px;box-shadow:var(--sh)}
