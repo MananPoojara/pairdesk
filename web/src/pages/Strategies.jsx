@@ -35,8 +35,8 @@ import { VARIANTS } from '../lib/variantData'
 import './strategies.css'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const monthLabel = m => { const d = new Date(m + 'T00:00:00'); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
-const monthShort = m => { const d = new Date(m + 'T00:00:00'); return `${MONTHS[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(2)}` }
+const monthLabel = m => { const d = new Date(m + 'T00:00:00Z'); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
+const monthShort = m => { const d = new Date(m + 'T00:00:00Z'); return `${MONTHS[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(2)}` }
 const fCr = n => `${n >= 0 ? '+' : '−'}₹${Math.abs(n).toFixed(2)} Cr`
 const pctS = n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 const uD = n => (n >= 0 ? 'u' : 'd')
@@ -462,7 +462,7 @@ function buildLegYearRows(rows, combinedYears) {
 
 function Heatmap({ monthly }) {
   const map = {}
-  monthly.forEach(m => { const d = new Date(m.month + 'T00:00:00'); map[`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`] = m.pct })
+  monthly.forEach(m => { const d = new Date(m.month + 'T00:00:00Z'); map[`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`] = m.pct })
   const years = [...new Set(monthly.map(m => m.month.slice(0, 4)))].sort()
   return (
     <div className="hm">
