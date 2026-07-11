@@ -16,6 +16,7 @@ import {
 } from '../lib/equityBacktest'
 import { fmtNum } from '../lib/format'
 import { VARIANTS } from '../lib/variantData'
+import { VARIANT_TRADES } from '../lib/variantTrades'
 import './clients.css'
 
 const CURVE_W = 800
@@ -371,6 +372,26 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
   const nc = stats.net_inr >= 0 ? 'u' : 'd', rc = stats.return_pct >= 0 ? 'u' : 'd'
   const vScaledCr = vActive ? (allocationCr).toFixed(vScale < 1 ? 2 : 0) : null
 
+  // Real per-trade blotter for the active variant (from the source Excels), ₹ scaled to allocation.
+  const vKey = dInstr === 'opt' ? 'options' : dIdx === 'banknifty' ? 'banknifty' : null
+  const vTrades = vKey === 'banknifty'
+    ? VARIANT_TRADES.banknifty.trades.map(t => ({
+        ...t,
+        lots: Math.max(1, Math.round(t.lots * vScale)),
+        net_inr: Math.round(t.net_inr * vScale),
+        combined_pl_inr: Math.round(t.combined_pl_inr * vScale),
+      }))
+    : vKey === 'options'
+    ? VARIANT_TRADES.options.trades.map(t => ({ ...t, net_inr: Math.round(t.pct / 100 * aumInr) }))
+    : []
+  // BankNifty charges (STT/exchange/SEBI/stamp/GST) scaled to allocation, in the live footer's shape.
+  const vc = VARIANT_TRADES.banknifty.charges_inr
+  const vCh = vKey === 'banknifty' ? {
+    stt_inr: Math.round(vc.stt * vScale), exch_inr: Math.round(vc.exch * vScale),
+    sebi_inr: Math.round(vc.sebi * vScale), stamp_inr: Math.round(vc.stamp * vScale),
+    gst_inr: Math.round(vc.gst * vScale), total_inr: Math.round(vc.total * vScale),
+  } : null
+
   return (
     <div className="drawer-wrap open">
       <div className="drawer">
@@ -438,11 +459,35 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           </div>
         </div>
 
-        {vActive ? (
-          <div className="d-sec">
-            <div className="d-sec-l">Trades · backtest</div>
-            <p style={{ color: 'var(--muted)', fontSize: 12, padding: '4px 18px 14px' }}>
-              This is the {vActive.summary.name.replace('Pair Trading — ', '')} backtest scaled to {cl.name}'s allocation — per-client trade blotter &amp; charge breakdown apply to the live Fut book only.
+        {vKey === 'banknifty' ? (
+          <>
+            <div className="d-trades">
+              <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Trades · {cl.name} · BankNifty backtest · {vTrades.length} legs {vScale !== 1 && `· scaled to ${fCr(allocationCr)}`}</span>
+                <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
+                  onClick={() => downloadTradesCsv(vTrades, cl.name, cl.code + '_BNF')}>↓ CSV</button>
+              </div>
+              <TradesTable trades={vTrades} />
+            </div>
+            <div className="d-charges">
+              <Ci l="STT" v={`₹${(vCh.stt_inr / 1e5).toFixed(1)} L (${(vCh.stt_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="Exchange" v={`₹${(vCh.exch_inr / 1e5).toFixed(1)} L (${(vCh.exch_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="SEBI" v={`₹${(vCh.sebi_inr / 1e5).toFixed(1)} L (${(vCh.sebi_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="Stamp" v={`₹${(vCh.stamp_inr / 1e5).toFixed(1)} L (${(vCh.stamp_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="GST" v={`₹${(vCh.gst_inr / 1e5).toFixed(1)} L (${(vCh.gst_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="Total (backtest)" big v={fCr(vCh.total_inr / 1e7)} />
+            </div>
+          </>
+        ) : vKey === 'options' ? (
+          <div className="d-trades">
+            <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Trades · {cl.name} · Options backtest · {vTrades.length} trades {vScale !== 1 && `· scaled to ${fCr(allocationCr)}`}</span>
+              <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
+                onClick={() => downloadOptionsCsv(vTrades, cl.name, cl.code)}>↓ CSV</button>
+            </div>
+            <OptionsTradesTable trades={vTrades} />
+            <p style={{ color: 'var(--muted)', fontSize: 11, padding: '2px 18px 12px' }}>
+              5-strategy options club (1st Month · XTROC · Bear Short · M5DP · TROC). Net % is on deployed capital; charges are embedded in the net.
             </p>
           </div>
         ) : (
@@ -516,6 +561,52 @@ function downloadTradesCsv(trades, clientName, clientCode) {
   a.download = `${clientCode}_trades.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function downloadOptionsCsv(trades, clientName, clientCode) {
+  const header = ['Strategy', 'Entry', 'Exit', 'Expiry', 'Net %', 'Net PnL (INR)', 'Net PnL (L)']
+  const rows = trades.map(t => [
+    t.strategy, t.entry, t.exit, t.expiry,
+    (t.pct >= 0 ? '+' : '') + t.pct.toFixed(2) + '%',
+    Math.round(t.net_inr), (t.net_inr / 1e5).toFixed(2),
+  ])
+  const csv = [header, ...rows]
+    .map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob(['﻿' + csv, ''], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${clientCode}_options_trades.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function OptionsTradesTable({ trades }) {
+  if (!trades.length) return <p style={{ color: 'var(--muted)', fontSize: 12, padding: '12px 18px' }}>No trades found.</p>
+  const STCLS = { '1st Month': 'l', 'XTROC': 's', 'Bear Short': 'd', 'M5DP': 'l', 'TROC': 's' }
+  return (
+    <div className="tscroll" style={{ margin: '8px 8px 12px', maxHeight: 360, overflowY: 'auto' }}>
+      <table><thead><tr>
+        <th>Strategy</th><th>Entry</th><th>Exit</th><th>Expiry</th>
+        <th className="num">Net %</th><th className="num">Net PnL</th>
+      </tr></thead><tbody>
+        {trades.map((t, i) => {
+          const nc = t.pct >= 0 ? 'u' : 'd'
+          return (
+            <tr key={i}>
+              <td><span className={'tg2 ' + (STCLS[t.strategy] || 'l')}>{t.strategy}</span></td>
+              <td className="m">{fDate(t.entry)}</td>
+              <td className="m">{fDate(t.exit)}</td>
+              <td className="m">{fDate(t.expiry)}</td>
+              <td className={'num m ' + nc}>{pctStr(t.pct)}</td>
+              <td className={'num m ' + nc}>{fL(t.net_inr)}</td>
+            </tr>
+          )
+        })}
+      </tbody></table>
+    </div>
+  )
 }
 
 function TradesTable({ trades }) {
