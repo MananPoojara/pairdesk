@@ -180,6 +180,9 @@ export default function Dashboard() {
   const pctOnAum = vActive ? vActive.summary.return_pct
     : pctOfBase(monthsAll.reduce((s, r) => s + (r.net_inr || 0), 0))
   // Variants/leg views have no live "today" number, so force the overall view.
+  // They're not live execution either: variants are spot-backtested, legs are an indicative
+  // decomposition of the live book — so we drop the live Realised/Unrealised framing for both.
+  const isSynthetic = !!(vActive || legFilter)
   const effMode = (vActive || legFilter) ? 'overall' : mode
   const heroAmt = effMode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
   const heroReal = effMode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
@@ -254,8 +257,8 @@ export default function Dashboard() {
       </div></div>
 
       <div className="shell">
-        <div className="title">Pair Trading — Live Book</div>
-        <div className="crumb">Midcap × Nifty · latest trading day {fmtDate(d.latest_date)} · showcasing {showcaseFrom} – {showcaseTo}</div>
+        <div className="title">{vActive ? `${vActive.summary.name} (spot-backtested)` : legFilter ? `Pair Trading — ${legLabel} leg (indicative)` : 'Pair Trading — Live Book'}</div>
+        <div className="crumb">Midcap × Nifty · {isSynthetic ? '' : `latest trading day ${fmtDate(d.latest_date)} · `}showcasing {showcaseFrom} – {showcaseTo}{vActive ? ' · spot-backtested' : legFilter ? ' · indicative' : ''}</div>
 
         {/* Index / Instrument variant toggle */}
         <div className="fu" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '10px 0 4px' }}>
@@ -287,14 +290,14 @@ export default function Dashboard() {
 
         <div className="heroband fu">
           <div className="hcard main">
-            <div className="l">Net PnL — Pair Trading <span className="seg2">
+            <div className="l">{vActive ? 'Net PnL — spot-backtested' : legFilter ? 'Net PnL — indicative leg' : 'Net PnL — Pair Trading'} {!isSynthetic && <span className="seg2">
               <b className={mode === 'overall' ? 'on' : undefined} onClick={() => setMode('overall')}>Overall</b>
               <b className={mode === 'today' ? 'on' : undefined} onClick={() => setMode('today')}>Today</b>
-            </span></div>
+            </span>}</div>
             <div className={'amt' + (heroAmt < 0 ? ' d' : '')}>{heroAmt === 0 ? '₹0' : fmtInr(heroAmt)}</div>
             <div className="sub">
-              <span>Realised <b>{heroReal === 0 ? '₹0' : fmtInr(heroReal)}</b></span>
-              <span>Unrealised <b>₹0</b></span>
+              {!isSynthetic && <span>Realised <b>{heroReal === 0 ? '₹0' : fmtInr(heroReal)}</b></span>}
+              {!isSynthetic && <span>Unrealised <b>₹0</b></span>}
               <span>{heroSince}</span>
             </div>
             <div className="area"><svg viewBox="0 0 560 70" preserveAspectRatio="none">
@@ -334,10 +337,10 @@ export default function Dashboard() {
           {/* Equity curve */}
           <div className="t c7 r3 flexcol fu equity-card">
             <div className="l eq-head">
-              <span>Equity Curve <span className="meta">net realised · monthly</span></span>
-              <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
+              <span>Equity Curve <span className="meta">{vActive ? 'spot-backtested · monthly' : legFilter ? 'indicative leg · monthly' : 'net realised · monthly'}</span></span>
+              {!isSynthetic && <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
                 <span></span> Backtest
-              </button>
+              </button>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(rangeStats.total_net_inr)}</div>
@@ -392,8 +395,8 @@ export default function Dashboard() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 16, fontSize: 11.5, fontWeight: 700, color: '#6b6457', marginTop: 6 }}>
-              <span><i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#0EA5E9', verticalAlign: 'middle', marginRight: 5 }}></i>Net PnL (realised)</span>
-              {showBacktest && <span><i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#F97316', verticalAlign: 'middle', marginRight: 5 }}></i>Spot backtest</span>}
+              <span><i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#0EA5E9', verticalAlign: 'middle', marginRight: 5 }}></i>Net PnL ({vActive ? 'spot-backtested' : legFilter ? 'indicative leg' : 'realised'})</span>
+              {showBacktest && backtestRows.length > 0 && <span><i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#F97316', verticalAlign: 'middle', marginRight: 5 }}></i>Spot backtest</span>}
             </div>
           </div>
 
@@ -473,16 +476,16 @@ export default function Dashboard() {
           {/* Period P&L — compact stats table */}
           {periodStat && (
             <div className="t c12 fu pdl-tile">
-              <div className="l">Period P&amp;L <span className="meta">net = realised + unrealised on live open leg · deployed ₹{baseAumCr} Cr</span></div>
+              <div className="l">Period P&amp;L <span className="meta">{vActive ? `spot-backtested · monthly net · deployed ₹${baseAumCr} Cr` : legFilter ? `indicative leg · monthly net · deployed ₹${baseAumCr} Cr` : `net = realised + unrealised on live open leg · deployed ₹${baseAumCr} Cr`}</span></div>
               <table className="pdl-table">
                 <thead><tr>
                   <th>Period</th><th className="num">Net PnL</th><th className="num">Realised</th><th className="num">Unrealised</th><th className="num">Trades</th><th className="num">Exposure</th><th className="num">Margin</th>
                 </tr></thead>
                 <tbody>
                   {[
-                    { label: 'Current Month', sub: fmtMonYr(periodStat.curMonth.month), p: periodStat.curMonth, unreal: totalUnreal },
+                    { label: 'Current Month', sub: fmtMonYr(periodStat.curMonth.month), p: periodStat.curMonth, unreal: isSynthetic ? 0 : totalUnreal },
                     { label: 'Last Month', sub: periodStat.lastMonth ? fmtMonYr(periodStat.lastMonth.month) : '—', p: periodStat.lastMonth, unreal: 0 },
-                    { label: 'Current Quarter', sub: qLabel(periodStat.cq.y, periodStat.cq.q), p: periodStat.cq, unreal: totalUnreal },
+                    { label: 'Current Quarter', sub: qLabel(periodStat.cq.y, periodStat.cq.q), p: periodStat.cq, unreal: isSynthetic ? 0 : totalUnreal },
                     { label: 'Last Quarter', sub: qLabel(periodStat.lq.y, periodStat.lq.q), p: periodStat.lq, unreal: 0 },
                   ].map(row => {
                     const realised = row.p ? (row.p.net_inr ?? row.p.net) : null
