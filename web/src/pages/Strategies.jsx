@@ -210,7 +210,7 @@ export default function Strategies() {
         {activeVariant && (
           <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
             <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{s.name}</span>
-            <span style={{ color: 'var(--muted)' }}>{s.subtitle} · {s.months} mo since {s.since} · backtested variant (indicative, on ₹{s.base_aum_cr} Cr base)</span>
+            <span style={{ color: 'var(--muted)' }}>{s.subtitle} · backtested variant (indicative, on ₹{s.base_aum_cr} Cr base)</span>
           </div>
         )}
         {legFilter && (

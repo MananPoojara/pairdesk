@@ -6,7 +6,7 @@ export const VARIANTS = {
   "options": {
     "summary": {
       "name": "Pair Trading \u2014 Options",
-      "subtitle": "Midcap100 future \u00d7 Nifty CE/PE options \u00b7 5-strategy club (combined)",
+      "subtitle": "Mar 2019 \u2013 Jun 2026",
       "active": false,
       "net_inr": 789150000,
       "net_cr": 78.92,
@@ -1244,7 +1244,7 @@ export const VARIANTS = {
   "banknifty": {
     "summary": {
       "name": "Pair Trading \u2014 BankNifty",
-      "subtitle": "Midcap \u00d7 Nifty futures pair \u00b7 BankNifty-enhanced (30 Cr)",
+      "subtitle": "Sep 2024 \u2013 Jun 2026",
       "active": false,
       "net_inr": 147072676,
       "net_cr": 14.71,

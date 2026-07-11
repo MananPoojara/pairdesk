@@ -138,3 +138,6 @@ tbody td{padding:11px 13px;border-bottom:1px solid #F4ECDF}tbody tr:hover{backgr
 .pdl-table td.u{color:var(--pos)}
 .pdl-table td.d{color:var(--neg)}
 .pdl-table tbody tr:hover{background:var(--soft)}
+/* compact heatmap for long-history variants (e.g. Options 2019–2026, 8 rows) */
+.pg-dash .hm-compact .cell{height:24px;font-size:8px}
+.pg-dash .hm-compact{gap:3px}

@@ -106,6 +106,10 @@ export default function Dashboard() {
   const dispWorstMo = vActive ? vActive.summary.worst_month_pct : rangeStats.worst_month_pct
   const dispSharpe = vActive ? vActive.summary.sharpe : rangeStats.sharpe
   const dispWinRate = vActive ? vActive.summary.win_rate : rangeStats.win_rate
+  // Heatmap can span many years for long-history variants (e.g. Options 2019→2026) —
+  // grow the tile (and its neighbour) and shrink cells so no rows get clipped.
+  const heatYears = new Set((curveMonthly || []).map(m => String(m.month).slice(0, 4))).size
+  const heatSpan = heatYears >= 5 ? 'span 3' : 'span 2'
 
   // client mix
   const mix = { Institution: 0, HNI: 0, Retail: 0 }
@@ -139,8 +143,10 @@ export default function Dashboard() {
     const dt = new Date(String(m || '').slice(0, 10) + 'T00:00:00Z')
     return isNaN(dt) ? '' : dt.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
   }
-  const showcaseFrom = d.monthly?.length ? fmtMonYr(d.monthly[0].month) : ''
-  const showcaseTo   = d.monthly?.length ? fmtMonYr(d.monthly[d.monthly.length - 1].month) : ''
+  // Reflect the series actually on screen (variant or live), so the range never contradicts the chart.
+  const showcaseSrc = (srcMonthly && srcMonthly.length) ? srcMonthly : d.monthly
+  const showcaseFrom = showcaseSrc?.length ? fmtMonYr(showcaseSrc[0].month) : ''
+  const showcaseTo   = showcaseSrc?.length ? fmtMonYr(showcaseSrc[showcaseSrc.length - 1].month) : ''
 
   // Period P&L — current/last month & quarter, from the full monthly series (fixed, not range-dependent).
   // Percentages use the deployed capital (base_aum_cr, ₹30 Cr) — same basis as every other % in the app.
@@ -269,7 +275,7 @@ export default function Dashboard() {
         {vActive && (
           <div className="fu" style={{ background: 'color-mix(in srgb, var(--primary) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', borderRadius: 8, padding: '9px 14px', margin: '2px 0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
             <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{vActive.summary.name}</span>
-            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · {vActive.summary.months} mo since {vActive.summary.since} · backtested variant, indicative on ₹{vActive.summary.base_aum_cr} Cr (performance panels only — book &amp; positions stay live)</span>
+            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · backtested variant, indicative on ₹{vActive.summary.base_aum_cr} Cr (performance panels only — book &amp; positions stay live)</span>
           </div>
         )}
         {legFilter && (
@@ -398,7 +404,7 @@ export default function Dashboard() {
           </div>
 
           {/* Client mix */}
-          <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.05s' }}>
+          <div className="t c5 flexcol fu" style={{ animationDelay: '.05s', gridRow: heatSpan }}>
             <div className="l">Client Mix <span className="meta">{d.clients.length} · by capital</span></div>
             <div className="pcont">
               <div className="pie" style={{ background: pieBg }}><div className="c"><b>{d.clients.length}</b><small>clients</small></div></div>
@@ -412,9 +418,9 @@ export default function Dashboard() {
           </div>
 
           {/* Monthly heatmap */}
-          <div className="t c7 r2 flexcol fu">
+          <div className="t c7 flexcol fu" style={{ gridRow: heatSpan }}>
             <div className="l">Monthly Returns <span className="meta">by entry month</span></div>
-            <Heatmap monthly={curveMonthly} />
+            <Heatmap monthly={curveMonthly} compact={heatYears >= 5} />
             <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
           </div>
 
@@ -654,14 +660,14 @@ function Pencil({ onClick }) {
   return <span className="ed" style={{ color: 'var(--primary)', cursor: 'pointer' }} onClick={onClick}>✎</span>
 }
 
-function Heatmap({ monthly }) {
+function Heatmap({ monthly, compact }) {
   const map = {}
   monthly.forEach(m => { const dt = new Date(m.month); map[`${dt.getUTCFullYear()}-${dt.getUTCMonth() + 1}`] = m.pct })
   // Derive years from the data so variants (which span more years) show their full history.
   const dataYears = [...new Set((monthly || []).map(m => String(m.month).slice(0, 4)))].sort()
   const years = dataYears.length ? dataYears : ['2024', '2025', '2026']
   return (
-    <div className="hm">
+    <div className={'hm' + (compact ? ' hm-compact' : '')}>
       {years.flatMap(y => {
         const cells = [<div key={y + '-yl'} className="yl">{"'" + y.slice(2)}</div>]
         for (let mo = 1; mo <= 12; mo++) {
