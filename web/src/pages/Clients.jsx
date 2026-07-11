@@ -15,6 +15,7 @@ import {
   equityValueDomain,
 } from '../lib/equityBacktest'
 import { fmtNum } from '../lib/format'
+import { VARIANTS } from '../lib/variantData'
 import './clients.css'
 
 const CURVE_W = 800
@@ -345,6 +346,8 @@ function ClientCard({ c, cls, cat, idx, active, onToggle, onEdit }) {
 
 function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
   const [rangeKey, setRangeKey] = useState('all')
+  const [dInstr, setDInstr] = useState('fut')    // fut | opt
+  const [dIdx, setDIdx] = useState('combined')   // combined | banknifty
   const catCls = CAT_CLS[cl.category] || 'retail'
   const catLbl = CAT_LBL[cl.category] || cl.category.toUpperCase()
   const strategy = primaryStrategy(cl)
@@ -352,12 +355,21 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
   const exposureCr = strategy?.exposure_cr ?? allocationCr
   const leverage = strategy?.leverage ?? (allocationCr > 0 ? exposureCr / allocationCr : 0)
   const aumInr = allocationCr * 1e7
-  const filtered = filterMonthly(cl.monthly, rangeKey)
+  // Variant toggle: Options / BankNifty take the 30 Cr backtest and scale ₹ to THIS client's
+  // allocation (return %, Sharpe, DD are the strategy's own; only the ₹ amounts scale).
+  const vActive = dInstr === 'opt' ? VARIANTS.options : dIdx === 'banknifty' ? VARIANTS.banknifty : null
+  const vScale = allocationCr / (vActive?.summary.base_aum_cr || 30)
+  const srcMonthly = vActive
+    ? vActive.monthly.map(m => ({ ...m, net_inr: Math.round(m.net_inr * vScale), gross_inr: Math.round(m.net_inr * vScale), charges_inr: 0, cumulative_inr: Math.round(m.cumulative_inr * vScale) }))
+    : cl.monthly
+  const filtered = filterMonthly(srcMonthly, rangeKey)
   const stats = computeStats(filtered, aumInr)
-  const pairMaxDd = Number(cl.stats?.pair_max_dd_pct ?? cl.stats?.max_dd_pct ?? stats.max_dd_pct)
-  const trades = filterTrades(cl.recent_trades, filtered)
+  const pairMaxDd = vActive ? Number(vActive.summary.pair_max_dd_pct)
+    : Number(cl.stats?.pair_max_dd_pct ?? cl.stats?.max_dd_pct ?? stats.max_dd_pct)
+  const trades = vActive ? [] : filterTrades(cl.recent_trades, filtered)
   const ch = cl.charges, chT = ch.total_inr || 1
   const nc = stats.net_inr >= 0 ? 'u' : 'd', rc = stats.return_pct >= 0 ? 'u' : 'd'
+  const vScaledCr = vActive ? (allocationCr).toFixed(vScale < 1 ? 2 : 0) : null
 
   return (
     <div className="drawer-wrap open">
@@ -375,6 +387,23 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           ))}
         </div>
 
+        <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '2px 18px 0' }}>
+          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Index</span>
+          {[['combined', 'Combined'], ['banknifty', 'BankNifty']].map(([k, label]) => (
+            <button key={k} disabled={dInstr === 'opt'} className={'chip' + (dIdx === k ? ' on' : '')}
+              onClick={() => dInstr !== 'opt' && setDIdx(k)}>{label}</button>
+          ))}
+          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 8 }}>Instrument</span>
+          <button className={'chip' + (dInstr === 'fut' ? ' on' : '')} onClick={() => setDInstr('fut')}>Fut</button>
+          <button className={'chip' + (dInstr === 'opt' ? ' on' : '')} onClick={() => setDInstr('opt')}>Options</button>
+        </div>
+        {vActive && (
+          <div style={{ margin: '8px 18px 0', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{vActive.summary.name.replace('Pair Trading — ', '')} variant</span>
+            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · backtest scaled to {fCr(allocationCr)} allocation ({pctStr(vActive.summary.return_pct)} on {vActive.summary.base_aum_cr} Cr → {fL(Math.round(vActive.summary.net_inr * vScale))})</span>
+          </div>
+        )}
+
         <div className="d-hero">
           <Hk l="Net PnL" cls={nc} v={fL(stats.net_inr)} />
           <Hk l="Return" cls={rc} v={pctStr(stats.return_pct)} />
@@ -384,7 +413,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           <Hk l="Win months" v={stats.wins + ' / ' + stats.total_months} />
         </div>
 
-        <EquityCurve monthly={filtered} allocationCr={allocationCr} backtest={backtest} backtestBaseAum={backtestBaseAum} />
+        <EquityCurve monthly={filtered} allocationCr={allocationCr} backtest={vActive ? null : backtest} backtestBaseAum={backtestBaseAum} />
 
         <div className="d-sec">
           <div className="d-sec-l">Month-on-Month Returns · % of strategy allocation</div>
@@ -409,27 +438,38 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           </div>
         </div>
 
-        <div className="d-trades">
-          <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Trades · {cl.name} · {trades.length} in range</span>
-            {trades.length > 0 && (
-              <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
-                onClick={() => downloadTradesCsv(trades, cl.name, cl.code)}>
-                ↓ CSV
-              </button>
-            )}
+        {vActive ? (
+          <div className="d-sec">
+            <div className="d-sec-l">Trades · backtest</div>
+            <p style={{ color: 'var(--muted)', fontSize: 12, padding: '4px 18px 14px' }}>
+              This is the {vActive.summary.name.replace('Pair Trading — ', '')} backtest scaled to {cl.name}'s allocation — per-client trade blotter &amp; charge breakdown apply to the live Fut book only.
+            </p>
           </div>
-          <TradesTable trades={trades} />
-        </div>
+        ) : (
+          <>
+            <div className="d-trades">
+              <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Trades · {cl.name} · {trades.length} in range</span>
+                {trades.length > 0 && (
+                  <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
+                    onClick={() => downloadTradesCsv(trades, cl.name, cl.code)}>
+                    ↓ CSV
+                  </button>
+                )}
+              </div>
+              <TradesTable trades={trades} />
+            </div>
 
-        <div className="d-charges">
-          <Ci l="STT" v={`₹${(ch.stt_inr / 1e5).toFixed(1)} L (${(ch.stt_inr / chT * 100) | 0}%)`} />
-          <Ci l="Exchange" v={`₹${(ch.exch_inr / 1e5).toFixed(1)} L (${(ch.exch_inr / chT * 100) | 0}%)`} />
-          <Ci l="SEBI" v={`₹${(ch.sebi_inr / 1e5).toFixed(1)} L (${(ch.sebi_inr / chT * 100) | 0}%)`} />
-          <Ci l="Stamp" v={`₹${(ch.stamp_inr / 1e5).toFixed(1)} L (${(ch.stamp_inr / chT * 100) | 0}%)`} />
-          <Ci l="GST" v={`₹${(ch.gst_inr / 1e5).toFixed(1)} L (${(ch.gst_inr / chT * 100) | 0}%)`} />
-          <Ci l="Total (lifetime)" big v={fCr(ch.total_inr / 1e7)} />
-        </div>
+            <div className="d-charges">
+              <Ci l="STT" v={`₹${(ch.stt_inr / 1e5).toFixed(1)} L (${(ch.stt_inr / chT * 100) | 0}%)`} />
+              <Ci l="Exchange" v={`₹${(ch.exch_inr / 1e5).toFixed(1)} L (${(ch.exch_inr / chT * 100) | 0}%)`} />
+              <Ci l="SEBI" v={`₹${(ch.sebi_inr / 1e5).toFixed(1)} L (${(ch.sebi_inr / chT * 100) | 0}%)`} />
+              <Ci l="Stamp" v={`₹${(ch.stamp_inr / 1e5).toFixed(1)} L (${(ch.stamp_inr / chT * 100) | 0}%)`} />
+              <Ci l="GST" v={`₹${(ch.gst_inr / 1e5).toFixed(1)} L (${(ch.gst_inr / chT * 100) | 0}%)`} />
+              <Ci l="Total (lifetime)" big v={fCr(ch.total_inr / 1e7)} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

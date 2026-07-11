@@ -109,3 +109,9 @@
 
 /* FIX: keep the category-tile bento auto-height (dashboard's global 96px rows would clip it) */
 .pg-clients .bento{grid-auto-rows:auto}
+
+/* Drawer variant toggle chips */
+.pg-clients .var-bar .chip{border:1px solid var(--line);background:#fff;font-family:inherit;font-weight:700;font-size:11px;color:#6b6457;padding:5px 12px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s}
+.pg-clients .var-bar .chip:hover{border-color:var(--primary);color:var(--primary)}
+.pg-clients .var-bar .chip.on{background:linear-gradient(135deg,var(--primary),var(--accent));border-color:transparent;color:#fff}
+.pg-clients .var-bar .chip:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
