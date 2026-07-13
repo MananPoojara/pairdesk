@@ -76,6 +76,18 @@ trades = df[["date","Symbol","expiry","Trade Type","Qty",
 trades.columns = ["date","symbol","expiry","direction","qty",
                   "entry","exit","net_profit_xl","total_exp_xl","gross_xl"]
 
+# Lot size per symbol = GCD of that symbol's traded quantities, so lots × lot_size
+# reproduces the EXACT quantity. The sheet uses spot-adjusted quantities that are NOT
+# clean multiples of the nominal NSE lot (e.g. MIDCPNIFTY 27240); a hardcoded lot_size
+# floored those, silently dropping size — gross is recomputed downstream from
+# lots × lot_size, so any mismatch corrupts MoM / yearly / return. GCD guarantees exactness.
+from math import gcd
+from functools import reduce
+LOT_SIZE = {sym: reduce(gcd, (int(q) for q in grp["qty"]))
+            for sym, grp in trades.groupby("symbol")}
+print("Lot sizes (GCD of quantities): " +
+      ", ".join(f"{s}={l}" for s, l in LOT_SIZE.items()))
+
 print(f"\n{'='*68}")
 print(f"{'RECONCILIATION':^68}")
 print(f"{'='*68}")
@@ -110,7 +122,12 @@ for i, r in trades.iterrows():
         errors += 1
 
     flag = "✓" if ok else f"✗ Δ{diff:+.2f}"
-    lot_size = 50 if sym == "MIDCPNIFTY" else 25
+    lot_size = LOT_SIZE[sym]
+    lots     = qty // lot_size
+    # Hard guarantee: lots × lot_size must equal the exact quantity, else gross
+    # recomputed downstream (points × lots × lot_size) would not match the Excel.
+    assert lots * lot_size == qty, \
+        f"qty {qty} not divisible by lot_size {lot_size} for {sym} on {d}"
     regime   = "BULL" if (sym == "MIDCPNIFTY" and dirn == "LONG") or \
                          (sym == "NIFTY" and dirn == "SHORT") else "BEAR"
     leg      = "BULL" if sym == "MIDCPNIFTY" else "BEAR"
@@ -124,7 +141,7 @@ for i, r in trades.iterrows():
         contract=f"{sym}{d.strftime('%y%b').upper()}FUT",          # entry-month label
         contract_expiry=f"{sym}{r['expiry'].strftime('%y%b').upper()}FUT",  # expiry-month (matches parquet)
         expiry=r["expiry"], direction=dirn,
-        lots=qty // lot_size, lot_size=lot_size,
+        lots=lots, lot_size=lot_size,
         entry_price=entry, exit_price=exit_,
         points=points, gross_paise=to_paise(gross),
         stt_paise=to_paise(ch["stt"]),
@@ -185,10 +202,11 @@ else:
 
 # Single real client — AUM ₹30 Cr (sheet: P&L 30 Cr)
 cur.execute("""
-    INSERT INTO clients (code, name, category, aum_paise)
-    VALUES ('TEST', 'Test', 'Institution', 30_000_000_000)  -- ₹30 Cr
+    INSERT INTO clients (code, name, category, aum_paise, is_active)
+    VALUES ('TEST', 'Test', 'Institution', 30_000_000_000, TRUE)  -- ₹30 Cr
     ON CONFLICT (code) DO UPDATE
-      SET name=EXCLUDED.name, category=EXCLUDED.category, aum_paise=EXCLUDED.aum_paise
+      SET name=EXCLUDED.name, category=EXCLUDED.category,
+          aum_paise=EXCLUDED.aum_paise, is_active=TRUE   -- always re-activate the seeded client
     RETURNING id
 """)
 client_id = cur.fetchone()[0]

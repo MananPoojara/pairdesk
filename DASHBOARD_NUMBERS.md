@@ -29,16 +29,24 @@ net_inr   = gross_inr − charges_inr
 `charges_inr` = STT + Exchange + SEBI + Stamp + GST for that trade
 (`trade_charges` table, stored in paise; ÷100 → rupees).
 
+**Quantity — must be exact.** `qty = lots × lot_size`, and `gross` above is
+recomputed from `lots × lot_size`, so this product must equal the sheet's exact
+quantity. The sheet uses spot-adjusted quantities that are *not* clean multiples of
+the nominal NSE lot, so the ingest sets `lot_size = GCD(all of that symbol's
+quantities)` (MIDCPNIFTY = 60, NIFTY = 50) and asserts `lots × lot_size == qty`.
+`Data/ingest_pnl.py`. *(Fixed 2026-07-13 — previously a hardcoded lot_size floored
+17 MIDCPNIFTY legs, dropping ~₹3.8 L of size and skewing those months' MoM.)*
+
 ---
 
 ## 1. Hero card — "Net PnL — Pair Trading"
 
 | Number | Derived from | Formula / code |
 |--------|--------------|----------------|
-| **Net PnL (Overall)** `+₹13.9 Cr` | All closed trades, all clients | Running sum of monthly net → last cumulative value. `cumulative_inr = SUM(gross−charges) OVER (ORDER BY month)`; hero takes the final row. `dashboard.js` 83, 107, 198 |
+| **Net PnL (Overall)** `+₹13.95 Cr` | All closed trades, all clients | Running sum of monthly net → last cumulative value. `cumulative_inr = SUM(gross−charges) OVER (ORDER BY month)`; hero takes the final row. `dashboard.js` 83, 107, 198 |
 | **Realised** | same | = Net PnL (every trade is closed, so all P&L is realised). `dashboard.js` 239 |
 | **Unrealised** `₹0` | — | Always ₹0 in the Overall/Combined view (no open synthetic leg). `dashboard.js` 240 |
-| **Return %** `+46.48%` | Net PnL ÷ base | `totalNet / (30 Cr) × 100`. `dashboard.js` 199 |
+| **Return %** `+46.51%` | Net PnL ÷ base | `totalNet / (30 Cr) × 100`. `dashboard.js` 199 |
 | **Date span** `1 Sep 24 → 30 Jun 26` | first & last trade month | range of the monthly series |
 | **Today (`Today` toggle)** | last actual trade day in DB | net of the single most-recent `trade_date` = `Σ(gross) − Σ(charges)` for that day. `dashboard.js` 208–224 |
 
@@ -80,7 +88,7 @@ Category bands: Retail `<₹5 Cr`, HNI `₹5–100 Cr`, Institution `>₹100 Cr`
 | **Curve (blue)** | monthly cumulative net | plots `cumulative_inr` per month |
 | **Spot backtest (orange, live only)** | `Data/SpotData` spot series | naive spot pair benchmark, re-zeroed to the range. `dashboard.js` 286–291 |
 | **Best mo** `+10.62%` | monthly nets | `max(month net) / 30 Cr × 100`. `dashboard.js` 105, 200 |
-| **Worst** `−2.86%` | monthly nets | `min(month net) / 30 Cr × 100`. `dashboard.js` 106, 201 |
+| **Worst** `−2.87%` | monthly nets | `min(month net) / 30 Cr × 100`. `dashboard.js` 106, 201 |
 | **Max DD** `−2.5%` | cumulative curve | peak-to-trough: for each point `dd = (peak − value)/peak`; Max DD = worst `dd`. `dashboard.js` 19–27, 109 |
 | **Sharpe** `2.15` | monthly % returns | `mean(monthly%) / stdev(monthly%) × √12`, where each `monthly% = net / 30 Cr × 100`. `dashboard.js` 9–15, 108 |
 | **Win rate** `77%` | monthly nets | `count(month net > 0) / total months × 100`. `dashboard.js` 101–102 |
@@ -142,7 +150,7 @@ BankNifty months are NAV-scaled (compounded → +49.02%). See
 
 | Number | Derived from | Formula / code |
 |--------|--------------|----------------|
-| **Return on AUM** `+46.48%` | total net | `totalNet / 30 Cr × 100` (same value as hero Return %). `Dashboard.jsx` 178, `pctOfBase` |
+| **Return on AUM** `+46.51%` | total net | `totalNet / 30 Cr × 100` (same value as hero Return %). `Dashboard.jsx` 178, `pctOfBase` |
 | **Avg AUM · deployed** `₹30.0 Cr` | base | the ₹30 Cr deployed base (`baseAumCr`). `Dashboard.jsx` |
 
 ---
