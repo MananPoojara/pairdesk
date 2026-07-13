@@ -38,7 +38,7 @@ export default function Dashboard() {
   })
 
   const [mode, setMode] = useState('overall')   // overall | today
-  const [side, setSide] = useState('all')        // all | long | short
+  const [posInstr, setPosInstr] = useState('fut') // fut | opt (Open Positions instrument)
   const [q, setQ] = useState('')
   const [range, setRange] = useState('All')
   const [customStartDate, setCustomStartDate] = useState('')
@@ -58,11 +58,20 @@ export default function Dashboard() {
   if (!d) return <div className="shell"><div className="crumb">Loading…</div></div>
 
   const book = { ...d.book, ...(lev || {}) }
+  // The backtest/book is calibrated at ₹30 Cr (base_aum_cr). The actual deployed AUM is the sum
+  // of active clients (book.aum_cr). We keep every % on the 30 Cr base (scale-invariant) but
+  // SCALE the displayed ₹ to the real AUM, so the dashboard reflects the capital actually
+  // deployed instead of looking hardcoded at ₹30 Cr. dispScale = AUM / 30.
+  const dispBaseCr = d.book.base_aum_cr ?? 30
+  const dispAumCr = (book.aum_cr && book.aum_cr > 0) ? book.aum_cr : dispBaseCr   // fall back to base if no AUM
+  const dispScale = dispBaseCr > 0 ? dispAumCr / dispBaseCr : 1
+  const scaleInr = v => Math.round((v || 0) * dispScale)
   const pos = d.positions || []
   const niftyPos = pos.find(p => p.underlying === 'NIFTY') || null
   const midPos = pos.find(p => p.underlying === 'MIDCPNIFTY') || null
-  const totalUnreal = (niftyPos?.unrealised_inr || 0) + (midPos?.unrealised_inr || 0)
-  const spreadPct = totalUnreal / d.book.aum_cr / 1e7 * 100
+  const totalUnrealRaw = (niftyPos?.unrealised_inr || 0) + (midPos?.unrealised_inr || 0)
+  const totalUnreal = scaleInr(totalUnrealRaw)      // open-position mark-to-market, scaled to AUM
+  const spreadPct = totalUnrealRaw / dispBaseCr / 1e7 * 100
 
   // Variant toggle: Options / BankNifty swap the PERFORMANCE data (curve, heatmap, yearly,
   // hero PnL) to hardcoded verified showcase data. The live book (positions, clients, margin)
@@ -185,19 +194,19 @@ export default function Dashboard() {
   // decomposition of the live book — so we drop the live Realised/Unrealised framing for both.
   const isSynthetic = !!(vActive || legFilter)
   const effMode = (vActive || legFilter) ? 'overall' : mode
-  const heroAmt = effMode === 'overall' ? rangeStats.total_net_inr : d.hero.today.net_inr
-  const heroReal = effMode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr
+  const heroReal = scaleInr(effMode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr)  // realised, scaled to AUM
+  const heroUnreal = isSynthetic ? 0 : totalUnreal          // open-position mark-to-market (already scaled)
+  const heroAmt = heroReal + heroUnreal                     // Net PnL = realised + unrealised
   const heroSince = effMode === 'overall'
     ? `${rangeStats.return_pct >= 0 ? '+' : ''}${rangeStats.return_pct}% · ${vActive ? vActive.summary.subtitle : legFilter ? legLabel + ' only' : activeRangeLabel}`
     : `last trading day · ${fmtDate(d.hero.today.date)}`
 
-  // positions filtered
-  const shownPos = pos.filter(p => {
-    const s = p.direction === 'LONG' ? 'long' : 'short'
-    const sideOk = side === 'all' || s === side
-    const qOk = !q || (p.client || '').toLowerCase().includes(q.toLowerCase())
-    return sideOk && qOk
-  })
+  // Open positions — the live futures pair, sized & marked to the real AUM.
+  const shownPos = pos
+    .filter(p => !q || (p.client || '').toLowerCase().includes(q.toLowerCase()))
+    .map(p => ({ ...p, lots: Math.round(p.lots * dispScale), unrealised_inr: scaleInr(p.unrealised_inr) }))
+  const combinedUnreal = totalUnreal                                   // pair combined P/L (scaled)
+  const combinedPct = spreadPct                                        // pair combined % (on deployed base)
 
   function applyPreset(nextRange) {
     setRange(nextRange)
@@ -279,7 +288,7 @@ export default function Dashboard() {
         {vActive && (
           <div className="fu" style={{ background: 'color-mix(in srgb, var(--primary) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', borderRadius: 8, padding: '9px 14px', margin: '2px 0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
             <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{vActive.summary.name}</span>
-            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · backtested variant, indicative on ₹{vActive.summary.base_aum_cr} Cr (performance panels only — book &amp; positions stay live)</span>
+            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · backtested variant, indicative on ₹{dispAumCr} Cr (performance panels only — book &amp; positions stay live)</span>
           </div>
         )}
         {legFilter && (
@@ -298,7 +307,7 @@ export default function Dashboard() {
             <div className={'amt' + (heroAmt < 0 ? ' d' : '')}>{heroAmt === 0 ? '₹0' : fmtInr(heroAmt)}</div>
             <div className="sub">
               {!isSynthetic && <span>Realised <b>{heroReal === 0 ? '₹0' : fmtInr(heroReal)}</b></span>}
-              {!isSynthetic && <span>Unrealised <b>₹0</b></span>}
+              {!isSynthetic && <span>Unrealised <b className={heroUnreal >= 0 ? 'u' : 'd'}>{heroUnreal === 0 ? '₹0' : fmtInr(heroUnreal)}</b></span>}
               <span>{heroSince}</span>
             </div>
             <div className="area"><svg viewBox="0 0 560 70" preserveAspectRatio="none">
@@ -345,11 +354,11 @@ export default function Dashboard() {
 
           {/* Return on AUM / Avg AUM */}
           <div className="t c3 r2 flexcol fu" style={{ animationDelay: '.06s' }}>
-            <div className="l">Return on AUM <span className="meta">net ÷ avg AUM</span></div>
+            <div className="l">Net Return on AUM <span className="meta">net ÷ avg AUM</span></div>
             <div className={'v ' + (pctOnAum >= 0 ? 'u' : 'd')} style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{(pctOnAum >= 0 ? '+' : '') + pctOnAum.toFixed(2)}%</div>
             <div style={{ borderTop: '1px solid var(--line)', marginTop: 'auto', paddingTop: 10 }}>
               <div className="s" style={{ margin: 0 }}>Avg AUM · deployed</div>
-              <div className="m" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{fmtCr(baseAumCr)}</div>
+              <div className="m" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{fmtCr(dispAumCr)}</div>
             </div>
           </div>
 
@@ -373,7 +382,7 @@ export default function Dashboard() {
               <span>Equity Curve <span className="meta">{vActive ? 'spot-backtested · monthly' : legFilter ? 'indicative leg · monthly' : 'net realised · monthly'}</span></span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(rangeStats.total_net_inr)}</div>
+              <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(scaleInr(rangeStats.total_net_inr))}</div>
               <div style={{ display: 'flex', gap: 7 }}>
                 <MiniStat l="Best mo" cls="u" v={(dispBestMo >= 0 ? '+' : '') + dispBestMo.toFixed(2) + '%'} />
                 <MiniStat l="Worst" cls="d" v={(dispWorstMo >= 0 ? '+' : '') + dispWorstMo.toFixed(2) + '%'} />
@@ -413,9 +422,9 @@ export default function Dashboard() {
                 {equityTip && curveMonthly[equityTip.index] && (
                   <div className={'line-tip ' + (equityTip.yPct < 38 ? 'below' : 'above')} style={{ left: `${equityTip.xPct}%`, top: `${equityTip.yPct}%` }}>
                     <span>{fmtDate(curveMonthly[equityTip.index].month)}</span>
-                    <b>{fmtInr(curveMonthly[equityTip.index].cumulative_inr)}</b>
+                    <b>{fmtInr(scaleInr(curveMonthly[equityTip.index].cumulative_inr))}</b>
                     {showBacktest && equityTip.backtestIndex != null && backtestRows[equityTip.backtestIndex] && (
-                      <em>Spot benchmark {fmtInr(backtestRows[equityTip.backtestIndex].value)}</em>
+                      <em>Spot benchmark {fmtInr(scaleInr(backtestRows[equityTip.backtestIndex].value))}</em>
                     )}
                   </div>
                 )}
@@ -439,14 +448,14 @@ export default function Dashboard() {
 
           {/* Yearly returns */}
           <div className="t c5 r3 flexcol fu" style={{ animationDelay: '.04s' }}>
-            <div className="l">Yearly Return</div>
-            <EoyBars data={eoyReturns} />
+            <div className="l">Yearly Net Return</div>
+            <EoyBars data={eoyReturns} scale={dispScale} />
           </div>
 
           {/* Returns heatmap — full width, Monthly / Quarterly toggle */}
           <div className="t c12 flexcol fu" style={{ gridRow: heatSpan }}>
             <div className="l" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>{heatMode === 'quarter' ? 'Quarterly' : 'Monthly'} Returns <span className="meta">% of ₹{baseAumCr} Cr deployed · by entry {heatMode === 'quarter' ? 'quarter' : 'month'}</span></span>
+              <span>{heatMode === 'quarter' ? 'Quarterly' : 'Monthly'} Net Returns <span className="meta">% of ₹{dispAumCr} Cr deployed · by entry {heatMode === 'quarter' ? 'quarter' : 'month'}</span></span>
               <div className="chips" style={{ display: 'flex', gap: 6 }}>
                 <button className={'chip' + (heatMode === 'month' ? ' on' : '')} onClick={() => setHeatMode('month')}>Monthly</button>
                 <button className={'chip' + (heatMode === 'quarter' ? ' on' : '')} onClick={() => setHeatMode('quarter')}>Quarterly</button>
@@ -460,49 +469,59 @@ export default function Dashboard() {
 
           {/* Latest day */}
           <div className="t c12 todaytile fu">
-            <div className="hd"><b><span className="dot"></span>Latest Day</b><span>{fmtDate(d.hero.today.date)}</span></div>
+            <div className="hd"><b><span className="dot"></span>Today</b><span>{fmtDate(d.hero.today.date)}</span></div>
             <div className="cells">
-              <Cell l="Net PnL" v={fmtInr(d.hero.today.net_inr)} />
-              <Cell l="Realised" v={fmtInr(d.hero.today.realised_inr)} />
-              <Cell l="Unrealised" v="₹0" />
+              <Cell l="Net PnL" v={fmtInr(scaleInr(d.hero.today.net_inr) + totalUnreal)} />
+              <Cell l="Realised" v={fmtInr(scaleInr(d.hero.today.realised_inr))} />
+              <Cell l="Unrealised" v={fmtInr(totalUnreal)} />
               <Cell l="Trades" v={d.hero.today.trades ?? pos.length} />
-              <Cell l="Exposure" v={fmtCr(baseAumCr)} />
-              <Cell l="Margin" v={fmtCr(baseAumCr * 0.25)} />
+              <Cell l="Exposure" v={fmtCr(dispAumCr)} />
+              <Cell l="Margin" v={fmtCr(dispAumCr * 0.25)} />
             </div>
           </div>
 
-          {/* Positions */}
+          {/* Positions — combined pair, marked to market */}
           <div className="t c12 postile fu" style={{ gridRow: 'span 3' }}>
             <div className="pth"><b>Open Positions</b>
               <input className="srch" placeholder="⌕ Search client…" style={{ fontFamily: 'inherit', outline: 'none' }}
                 value={q} onChange={e => setQ(e.target.value)} />
               <div className="lsf">
-                {['all', 'long', 'short'].map(s => (
-                  <button key={s} className={s === side ? 'on' : undefined} onClick={() => setSide(s)}>
-                    {s === 'all' ? 'All' : s[0].toUpperCase() + s.slice(1)}
-                  </button>
-                ))}
+                <button className={posInstr === 'fut' ? 'on' : undefined} onClick={() => setPosInstr('fut')}>Fut</button>
+                <button className={posInstr === 'opt' ? 'on' : undefined} onClick={() => setPosInstr('opt')}>Option</button>
               </div>
             </div>
-            <div className="tscroll"><table>
-              <thead><tr><th>Client</th><th>Symbol</th><th>Expiry</th><th>Side</th><th>Lots</th><th>Entry</th><th>LTP</th><th>Points</th><th>Unrealised</th></tr></thead>
-              <tbody>
-                {shownPos.map((p, i) => (
-                  <tr key={i}>
-                    <td>{p.client}</td>
-                    <td className="m">{p.underlying}-FUT</td>
-                    <td className="m">{fmtDate(p.expiry)}</td>
-                    <td><span className={'tg2 ' + (p.direction === 'LONG' ? 'l' : 's')}>{p.direction}</span></td>
-                    <td className="m">{p.lots.toLocaleString('en-IN')}</td>
-                    <td className="m">{fmtNum(p.entry_price)}</td>
-                    <td className="m">{fmtNum(p.ltp)}</td>
-                    <td className={'m ' + (p.points >= 0 ? 'u' : 'd')}>{(p.points >= 0 ? '+' : '') + p.points.toFixed(1)}</td>
-                    <td className={'m ' + (p.unrealised_inr >= 0 ? 'u' : 'd')}>{fmtInr(p.unrealised_inr)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-            {shownPos.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 600, fontSize: 13, padding: 18 }}>No matching positions.</div>}
+            {posInstr === 'opt' ? (
+              <div style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 600, fontSize: 13, padding: '26px 18px' }}>
+                The Options variant is a spot-backtested overlay — the live book holds the futures pair only.
+              </div>
+            ) : (<>
+              <div className="tscroll"><table>
+                <thead><tr>
+                  <th>Client</th><th>Symbol</th><th>Expiry</th><th>Lots</th><th>Entry</th><th>LTP</th><th>Points</th>
+                  <th className="num">Unrealised</th><th className="num">Combined P/L</th><th className="num">Combined %</th>
+                </tr></thead>
+                <tbody>
+                  {shownPos.map((p, i) => {
+                    const cc = combinedUnreal >= 0 ? 'u' : 'd'
+                    return (
+                      <tr key={i}>
+                        <td>{p.client}</td>
+                        <td className="m">{p.underlying}-FUT</td>
+                        <td className="m">{fmtDate(p.expiry)}</td>
+                        <td className="m">{p.lots.toLocaleString('en-IN')}</td>
+                        <td className="m">{fmtNum(p.entry_price)}</td>
+                        <td className="m">{fmtNum(p.ltp)}</td>
+                        <td className={'m ' + (p.points >= 0 ? 'u' : 'd')}>{(p.points >= 0 ? '+' : '') + p.points.toFixed(1)}</td>
+                        <td className={'num m ' + (p.unrealised_inr >= 0 ? 'u' : 'd')}>{fmtInr(p.unrealised_inr)}</td>
+                        {i === 0 && <td className={'num m pair-cell ' + cc} rowSpan={shownPos.length} style={{ verticalAlign: 'middle' }}>{fmtInr(combinedUnreal)}</td>}
+                        {i === 0 && <td className={'num m pair-cell ' + cc} rowSpan={shownPos.length} style={{ verticalAlign: 'middle' }}>{(combinedPct >= 0 ? '+' : '') + combinedPct.toFixed(2)}%</td>}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table></div>
+              {shownPos.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 600, fontSize: 13, padding: 18 }}>No matching positions.</div>}
+            </>)}
           </div>
         </div>
       </div>
@@ -601,7 +620,7 @@ function nearestLineTip(event, pts, width, height, overlayPts = []) {
   return { index, backtestIndex, xPct: p.x / width * 100, yPct: p.y / height * 100 }
 }
 
-function EoyBars({ data }) {
+function EoyBars({ data, scale = 1 }) {
   const max = Math.max(...data.map(row => Math.abs(row.return_pct)), 1)
   return (
     <div className="eoy-bars">
@@ -610,7 +629,7 @@ function EoyBars({ data }) {
         const up = row.return_pct >= 0
         return (
           <div className="eoy-bar" key={row.year}>
-            <div className="barbox" data-tip={`${row.year}: ${(up ? '+' : '') + row.return_pct.toFixed(2)}%, net ${fmtInr(row.net_inr)}`}>
+            <div className="barbox" data-tip={`${row.year}: ${(up ? '+' : '') + row.return_pct.toFixed(2)}%, net ${fmtInr(Math.round(row.net_inr * scale))}`}>
               <i className={up ? 'u' : 'd'} style={{ height: h + '%' }}></i>
             </div>
             <b className={up ? 'u' : 'd'}>{(up ? '+' : '') + row.return_pct.toFixed(2)}%</b>

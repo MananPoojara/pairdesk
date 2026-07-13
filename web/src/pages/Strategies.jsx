@@ -181,7 +181,7 @@ export default function Strategies() {
             </div>
             <div className="statrow">
               <Sc l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} />
-              <Sc l="Return" cls={uD(strategyStats.return_pct)} v={pctS(strategyStats.return_pct)} />
+              <Sc l="Net Return" cls={uD(strategyStats.return_pct)} v={pctS(strategyStats.return_pct)} />
               <Sc l="Trades" v={activeVariant ? s.trades : rangeTrades} />
               <Sc l="Win %" v={strategyStats.win_rate + '%'} />
               <Sc l="Sharpe" v={dispSharpe} />
@@ -334,7 +334,7 @@ export default function Strategies() {
               <table>
                 <thead><tr><th>Year</th>
                   {activeVariant
-                    ? <><th className="num">Net P/L</th><th className="num">Return %</th></>
+                    ? <><th className="num">Net P/L</th><th className="num">Net Return %</th></>
                     : <><th className="num">Midcap P/L</th><th className="num">NIFTY P/L</th></>}
                   <th className="num">Max DD %</th><th className="num">Sharpe</th></tr></thead>
                 <tbody>

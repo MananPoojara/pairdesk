@@ -84,7 +84,7 @@ export default function Clients() {
                     <thead><tr>
                       <th>Start date</th><th>Client</th><th>Type</th>
                       <th className="num">Capital</th><th className="num">P&amp;L</th><th className="num">Current value</th>
-                      <th className="num">Return</th><th className="num">Leverage</th><th aria-label="expand"></th>
+                      <th className="num">Net Return</th><th className="num">Leverage</th><th aria-label="expand"></th>
                     </tr></thead>
                     <tbody>
                       {shown.map(c => (
@@ -451,7 +451,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
 
         <div className="d-hero">
           <Hk l="Net PnL" cls={nc} v={fL(stats.net_inr)} />
-          <Hk l="Return" cls={rc} v={pctStr(stats.return_pct)} />
+          <Hk l="Net Return" cls={rc} v={pctStr(stats.return_pct)} />
           <Hk l="Sharpe" v={stats.sharpe} />
           <Hk l="Win rate" cls="u" v={stats.win_rate + '%'} />
           <Hk l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
@@ -461,7 +461,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
         <EquityCurve monthly={filtered} allocationCr={allocationCr} backtest={vActive ? null : backtest} backtestBaseAum={backtestBaseAum} />
 
         <div className="d-sec">
-          <div className="d-sec-l">Month-on-Month Returns · % of strategy allocation</div>
+          <div className="d-sec-l">Month-on-Month Net Returns · % of strategy allocation</div>
           <Heatmap monthly={filtered} />
           <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
         </div>

@@ -141,3 +141,4 @@ tbody td{padding:11px 13px;border-bottom:1px solid #F4ECDF}tbody tr:hover{backgr
 /* compact heatmap for long-history variants (e.g. Options 2019–2026, 8 rows) */
 .pg-dash .hm-compact .cell{height:28px;font-size:11px}
 .pg-dash .hm-compact{gap:3px}
+.pg-dash .postile .pair-cell{border-left:1px solid var(--line);background:#FCFAF6}
