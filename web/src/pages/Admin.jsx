@@ -280,10 +280,27 @@ export default function Admin() {
   const { data: dash } = useQuery({ queryKey: ['dashboard'], queryFn: () => apiGet('/api/dashboard') })
   const exposure = dash ? `₹${dash.book.aum_cr.toFixed(1)} Cr` : '…'
   const html = rawHtml.replace('__EXPOSURE__', exposure)
+  // Place "Client management" INSIDE the shell, directly under "Risk & sizing defaults":
+  // split the static HTML into subbar / shell body / note, strip the shell wrapper, then
+  // re-wrap [risk defaults] + <ClientsManagement/> + [rest of the sections] in one shell.
+  const noteIdx = html.indexOf('<div class="note">')
+  const note = noteIdx >= 0 ? html.slice(noteIdx) : ''
+  const beforeNote = noteIdx >= 0 ? html.slice(0, noteIdx) : html
+  const shellStart = beforeNote.indexOf('<div class="shell')
+  const subbar = beforeNote.slice(0, shellStart)
+  const inner = beforeNote.slice(shellStart)
+    .replace(/^<div class="shell fu">/, '')
+    .replace(/<\/div>\s*$/, '')
+  const [risk, rest] = inner.split('<!-- 3 · Charge / tax configuration -->')
   return (
     <div className="pg-admin">
-      <ClientsManagement />
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      <div dangerouslySetInnerHTML={{ __html: subbar }} />
+      <div className="shell fu">
+        <div dangerouslySetInnerHTML={{ __html: risk }} />
+        <ClientsManagement />
+        <div dangerouslySetInnerHTML={{ __html: '<!-- 3 · Charge / tax configuration -->' + (rest || '') }} />
+      </div>
+      <div dangerouslySetInnerHTML={{ __html: note }} />
     </div>
   )
 }
