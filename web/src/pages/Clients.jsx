@@ -747,9 +747,6 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
     <div className="curve-wrap" ref={wrapRef}>
       <div className="curve-lbl">
         <span>Equity Curve · cumulative net PnL · Midcap × Nifty Pair Trade</span>
-        {backtestRows.length > 0 && <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
-          <span></span>Backtest
-        </button>}
       </div>
       <svg className="curve-svg" viewBox={`0 0 ${CURVE_W} ${CURVE_H}`} preserveAspectRatio="none" ref={svgRef}>
         <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
@@ -776,12 +773,12 @@ function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
           <div className="tt-mo">{fMonSh(tip.mo)}</div>
           <div className="tt-row"><span>Cumulative</span><b className={tip.cum >= 0 ? 'u' : 'd'}>{fL(tip.cum)}</b></div>
           <div className="tt-row"><span>This month</span><b className={tip.net >= 0 ? 'u' : 'd'}>{fL(tip.net)}</b></div>
-          {showBacktest && tip.backtest != null && <div className="tt-row"><span>Backtest</span><b className={tip.backtest >= 0 ? 'u' : 'd'}>{fL(tip.backtest)}</b></div>}
+          {showBacktest && tip.backtest != null && <div className="tt-row"><span>Spot benchmark</span><b className={tip.backtest >= 0 ? 'u' : 'd'}>{fL(tip.backtest)}</b></div>}
         </div>
       )}
       <div className="curve-foot">
         <div className="cf-ticks">{foot.map((f, i) => <span key={i}>{f}</span>)}</div>
-        {showBacktest && backtestRows.length > 0 && <span className="bt-foot">Spot backtest</span>}
+        {backtestRows.length > 0 && <span className="bt-foot" onClick={() => setShowBacktest(v => !v)} title="Click to show/hide the spot benchmark" style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}>Spot benchmark</span>}
       </div>
     </div>
   )

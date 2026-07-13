@@ -333,20 +333,50 @@ export default function Dashboard() {
         </div>
 
         <div className="bento">
+          {/* Margin */}
+          <div className="t c4 r2 flexcol fu" style={{ animationDelay: '.05s' }}>
+            <div className="l">Margin</div>
+            <div className="v" style={{ fontSize: 18 }}>{fmtCr(marginCr)}</div>
+            <div className="meter"><i className="used" style={{ width: '25%' }}></i><i className="free" style={{ width: '75%' }}></i></div>
+            <div className="mleg"><span>Used <b>{fmtCr(marginCr)}</b></span><span>Free <b>{fmtCr(freeCr)}</b></span></div>
+            <div className="s" style={{ marginTop: 'auto' }}>25% utilised · EOD</div>
+          </div>
+
+          {/* Return on AUM / Avg AUM */}
+          <div className="t c3 r2 flexcol fu" style={{ animationDelay: '.06s' }}>
+            <div className="l">Return on AUM <span className="meta">net ÷ avg AUM</span></div>
+            <div className={'v ' + (pctOnAum >= 0 ? 'u' : 'd')} style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{(pctOnAum >= 0 ? '+' : '') + pctOnAum.toFixed(2)}%</div>
+            <div style={{ borderTop: '1px solid var(--line)', marginTop: 'auto', paddingTop: 10 }}>
+              <div className="s" style={{ margin: 0 }}>Avg AUM · deployed</div>
+              <div className="m" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{fmtCr(baseAumCr)}</div>
+            </div>
+          </div>
+
+          {/* Exposure by leg */}
+          <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.1s' }}>
+            <div className="l">Exposure by leg <span className="meta">net notional · live book</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12, flex: 1 }}>
+              <LegCard name="Nifty" dir={niftyPos?.direction || 'SHORT'} cr={half} total={book.exposure_cr} color="#F97316" />
+              <LegCard name="Midcap" dir={midPos?.direction || 'LONG'} cr={half} total={book.exposure_cr} color="#0EA5E9" />
+            </div>
+            <div className="mleg" style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+              <span>Gross exposure <b>{fmtCr(book.exposure_cr)}</b></span>
+              <span>Net (L−S) <b>{fmtCr(0)}</b></span>
+              <span>Leverage <b>{book.leverage.toFixed(2)}×</b></span>
+            </div>
+          </div>
+
           {/* Equity curve */}
           <div className="t c7 r3 flexcol fu equity-card">
             <div className="l eq-head">
               <span>Equity Curve <span className="meta">{vActive ? 'spot-backtested · monthly' : legFilter ? 'indicative leg · monthly' : 'net realised · monthly'}</span></span>
-              {!isSynthetic && <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
-                <span></span> Backtest
-              </button>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(rangeStats.total_net_inr)}</div>
               <div style={{ display: 'flex', gap: 7 }}>
                 <MiniStat l="Best mo" cls="u" v={(dispBestMo >= 0 ? '+' : '') + dispBestMo.toFixed(2) + '%'} />
                 <MiniStat l="Worst" cls="d" v={(dispWorstMo >= 0 ? '+' : '') + dispWorstMo.toFixed(2) + '%'} />
-                <MiniStat l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(1) + '%'} />
+                <MiniStat l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
                 <MiniStat l="Sharpe" v={dispSharpe.toFixed(2)} />
                 <MiniStat l="Win rate" cls="u" v={dispWinRate.toFixed(0) + '%'} />
               </div>
@@ -384,7 +414,7 @@ export default function Dashboard() {
                     <span>{fmtDate(curveMonthly[equityTip.index].month)}</span>
                     <b>{fmtInr(curveMonthly[equityTip.index].cumulative_inr)}</b>
                     {showBacktest && equityTip.backtestIndex != null && backtestRows[equityTip.backtestIndex] && (
-                      <em>Backtest {fmtInr(backtestRows[equityTip.backtestIndex].value)}</em>
+                      <em>Spot benchmark {fmtInr(backtestRows[equityTip.backtestIndex].value)}</em>
                     )}
                   </div>
                 )}
@@ -397,7 +427,12 @@ export default function Dashboard() {
             </div>
             <div style={{ display: 'flex', gap: 16, fontSize: 11.5, fontWeight: 700, color: '#6b6457', marginTop: 6 }}>
               <span><i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#0EA5E9', verticalAlign: 'middle', marginRight: 5 }}></i>Net PnL ({vActive ? 'spot-backtested' : legFilter ? 'indicative leg' : 'realised'})</span>
-              {showBacktest && backtestRows.length > 0 && <span><i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#F97316', verticalAlign: 'middle', marginRight: 5 }}></i>Spot backtest</span>}
+              {backtestRows.length > 0 && (
+                <span onClick={() => setShowBacktest(v => !v)} title="Click to show/hide the spot benchmark"
+                  style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}>
+                  <i style={{ display: 'inline-block', width: 15, height: 3, borderRadius: 2, background: '#F97316', verticalAlign: 'middle', marginRight: 5 }}></i>Spot benchmark
+                </span>
+              )}
             </div>
           </div>
 
@@ -412,39 +447,6 @@ export default function Dashboard() {
             <div className="l">Monthly Returns <span className="meta">% of ₹{baseAumCr} Cr deployed · by entry month</span></div>
             <Heatmap monthly={curveMonthly} compact={heatYears >= 5} />
             <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
-          </div>
-
-          {/* Margin */}
-          <div className="t c4 r2 flexcol fu" style={{ animationDelay: '.05s' }}>
-            <div className="l">Margin</div>
-            <div className="v" style={{ fontSize: 18 }}>{fmtCr(marginCr)}</div>
-            <div className="meter"><i className="used" style={{ width: '25%' }}></i><i className="free" style={{ width: '75%' }}></i></div>
-            <div className="mleg"><span>Used <b>{fmtCr(marginCr)}</b></span><span>Free <b>{fmtCr(freeCr)}</b></span></div>
-            <div className="s" style={{ marginTop: 'auto' }}>25% utilised · EOD</div>
-          </div>
-
-          {/* Return on AUM / Avg AUM (moved out of the Period P&L row) */}
-          <div className="t c3 r2 flexcol fu" style={{ animationDelay: '.06s' }}>
-            <div className="l">Return on AUM <span className="meta">net ÷ avg AUM</span></div>
-            <div className={'v ' + (pctOnAum >= 0 ? 'u' : 'd')} style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{(pctOnAum >= 0 ? '+' : '') + pctOnAum.toFixed(2)}%</div>
-            <div style={{ borderTop: '1px solid var(--line)', marginTop: 'auto', paddingTop: 10 }}>
-              <div className="s" style={{ margin: 0 }}>Avg AUM · deployed</div>
-              <div className="m" style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{fmtCr(baseAumCr)}</div>
-            </div>
-          </div>
-
-          {/* Exposure by leg */}
-          <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.1s' }}>
-            <div className="l">Exposure by leg <span className="meta">net notional · live book</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12, flex: 1 }}>
-              <LegCard name="Nifty" dir={niftyPos?.direction || 'SHORT'} cr={half} total={book.exposure_cr} color="#F97316" />
-              <LegCard name="Midcap" dir={midPos?.direction || 'LONG'} cr={half} total={book.exposure_cr} color="#0EA5E9" />
-            </div>
-            <div className="mleg" style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-              <span>Gross exposure <b>{fmtCr(book.exposure_cr)}</b></span>
-              <span>Net (L−S) <b>{fmtCr(0)}</b></span>
-              <span>Leverage <b>{book.leverage.toFixed(2)}×</b></span>
-            </div>
           </div>
 
           {/* Latest day */}

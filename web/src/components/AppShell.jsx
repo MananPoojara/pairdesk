@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
-  { to: '/orders', label: 'Orders' },
+  // { to: '/orders', label: 'Orders' },   // hidden for now (route still works via direct URL)
   { to: '/clients', label: 'Clients' },
   { to: '/strategies', label: 'Strategies' },
   { to: '/history', label: 'History' },

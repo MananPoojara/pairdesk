@@ -53,6 +53,7 @@ export default function Strategies() {
   const [equityTip, setEquityTip] = useState(null)
   const [showBacktest, setShowBacktest] = useState(true)
   const [showDetailedStats, setShowDetailedStats] = useState(false)
+  const [showDetail, setShowDetail] = useState(false)   // card-first: reveal the full breakdown on click
   const [indexChip, setIndexChip] = useState('combined')
   const [instrMode, setInstrMode] = useState('fut')
 
@@ -172,7 +173,8 @@ export default function Strategies() {
 
         {/* strategy cards */}
         <div className="scards fu" style={{ animationDelay: '.04s' }}>
-          <div className="panel scard">
+          <div className="panel scard scard-click" onClick={() => setShowDetail(v => !v)} style={{ cursor: 'pointer' }}
+            title={showDetail ? 'Hide full breakdown' : 'Click to view full breakdown'}>
             <div className="hd">
               <div><div className="nm">{s.name}</div><div className="st">{s.subtitle}</div></div>
               <span className={'badge ' + (activeVariant || legFilter ? 'soon' : 'act')}>{activeVariant ? '◔ Spot-backtested' : legFilter ? '◔ Indicative' : '● Active'}</span>
@@ -192,13 +194,16 @@ export default function Strategies() {
                 <path d={spark.fill} fill="url(#sg)" />
                 <path d={spark.line} fill="none" stroke="#0EA5E9" strokeWidth="2.2" />
               </svg>
-              <div className="legend"><span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL</span></div>
+              <div className="legend" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL</span>
+                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{showDetail ? 'Hide breakdown ▲' : 'View full breakdown ▼'}</span>
+              </div>
             </div>
           </div>
 
           <div className="panel scard ghost">
             <div className="hd"><div><div className="nm">Index Momentum</div><div className="st">Trend-follow · index futures</div></div><span className="badge soon">Coming soon</span></div>
-            <div className="ghbody"><div className="big">◴</div><div style={{ fontSize: 12, fontWeight: 700 }}>In research</div><div style={{ fontSize: 11 }}>Backtest underway · target H2 FY27</div></div>
+            <div className="ghbody"><div className="big">◴</div><div style={{ fontSize: 12, fontWeight: 700 }}>In research</div><div style={{ fontSize: 11 }}>Research underway · target H2 FY27</div></div>
           </div>
           <div className="panel scard ghost">
             <div className="hd"><div><div className="nm">Vol Carry</div><div className="st">Options · short-vol overlay</div></div><span className="badge soon">Coming soon</span></div>
@@ -220,6 +225,7 @@ export default function Strategies() {
           </div>
         )}
 
+        {showDetail && (<>
         {/* detail bento */}
         <div className="bento fu" style={{ animationDelay: '.08s' }}>
           {/* equity curve */}
@@ -227,9 +233,6 @@ export default function Strategies() {
             <div className="t-l" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <b style={{ fontFamily: "'Familjen Grotesk'", fontWeight: 700, fontSize: 16, marginRight: 'auto' }}>Pair Trading — Equity Curve</b>
               <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{activeVariant ? 'spot-backtested · monthly EOD' : legFilter ? 'indicative leg · monthly EOD' : 'cumulative net PnL · monthly EOD'}</span>
-              {!(activeVariant || legFilter) && <button className={'bt-toggle ' + (showBacktest ? 'on' : '')} onClick={() => setShowBacktest(v => !v)}>
-                <span></span>Backtest
-              </button>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 12 }}>
               <div className={'m ' + uD(strategyStats.total_net_inr)} style={{ fontSize: 26, fontWeight: 600 }}>{fCr(strategyStats.total_net_inr / 1e7)} <span style={{ fontSize: 14 }}>/ {pctS(strategyStats.return_pct)}</span></div>
@@ -272,7 +275,7 @@ export default function Strategies() {
                     <span>{monthShort(curveMonthly[equityTip.index].month)}</span>
                     <b>{fCr(curveMonthly[equityTip.index].cumulative_inr / 1e7)}</b>
                     {showBacktest && equityTip.backtestIndex != null && backtestRows[equityTip.backtestIndex] && (
-                      <em>Backtest {fCr(backtestRows[equityTip.backtestIndex].value / 1e7)}</em>
+                      <em>Spot benchmark {fCr(backtestRows[equityTip.backtestIndex].value / 1e7)}</em>
                     )}
                   </div>
                 )}
@@ -285,7 +288,7 @@ export default function Strategies() {
             </div>
             <div className="legend">
               <span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL ({activeVariant ? 'spot-backtested' : legFilter ? 'indicative leg' : 'realised'})</span>
-              {showBacktest && backtestRows.length > 0 && <span><i style={{ background: '#F97316' }}></i>Spot backtest</span>}
+              {backtestRows.length > 0 && <span onClick={() => setShowBacktest(v => !v)} title="Click to show/hide the spot benchmark" style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}><i style={{ background: '#F97316' }}></i>Spot benchmark</span>}
             </div>
           </div>
 
@@ -411,6 +414,7 @@ export default function Strategies() {
             </table>
           </div>
         </div>
+        </>)}
       </div>
       <div className="note">Strategies · live data · 1 active strategy · Index Momentum &amp; Vol Carry in research</div>
     </div>

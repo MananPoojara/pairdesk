@@ -7,7 +7,7 @@
 export const SPOT_BACKTEST_BASE_AUM_CR = 30
 
 // max_dd_pct kept as the reference pair combined drawdown used across the app.
-export const pairReferenceStats = { max_dd_pct: 2.55 }
+export const pairReferenceStats = { max_dd_pct: 3.55 }
 
 export const spotBacktest = [
   { date: '2024-09-01', net_inr: -563815, midcap_net_inr: -23485795, nifty_net_inr: 22921980 },
