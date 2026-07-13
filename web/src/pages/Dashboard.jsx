@@ -322,7 +322,7 @@ export default function Dashboard() {
           <div className="hcard">
             <div className="l2">Book</div>
             <div className="row2">
-              <Mc l="AUM" v={fmtCr(book.aum_cr)} />
+              <Mc l="Capital" v={fmtCr(book.aum_cr)} />
               <Mc l={<>Exposure <Pencil onClick={() => setEditing(true)} /></>} v={fmtCr(book.exposure_cr)} />
               <Mc l="Clients" v={book.clients} />
               <Mc l="Strategies" v={book.strategies} />
@@ -354,7 +354,7 @@ export default function Dashboard() {
 
           {/* Return on AUM / Avg AUM */}
           <div className="t c3 r2 flexcol fu" style={{ animationDelay: '.06s' }}>
-            <div className="l">Net Return on AUM <span className="meta">net ÷ avg AUM</span></div>
+            <div className="l">Net Return on AUM</div>
             <div className={'v ' + (pctOnAum >= 0 ? 'u' : 'd')} style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{(pctOnAum >= 0 ? '+' : '') + pctOnAum.toFixed(2)}%</div>
             <div style={{ borderTop: '1px solid var(--line)', marginTop: 'auto', paddingTop: 10 }}>
               <div className="s" style={{ margin: 0 }}>Avg AUM · deployed</div>
@@ -364,7 +364,7 @@ export default function Dashboard() {
 
           {/* Exposure by leg */}
           <div className="t c5 r2 flexcol fu" style={{ animationDelay: '.1s' }}>
-            <div className="l">Exposure by leg <span className="meta">net notional · live book</span></div>
+            <div className="l">Exposure by leg</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12, flex: 1 }}>
               <LegCard name="Nifty" dir={niftyPos?.direction || 'SHORT'} cr={half} total={book.exposure_cr} color="#F97316" />
               <LegCard name="Midcap" dir={midPos?.direction || 'LONG'} cr={half} total={book.exposure_cr} color="#0EA5E9" />
@@ -379,7 +379,7 @@ export default function Dashboard() {
           {/* Equity curve */}
           <div className="t c7 r3 flexcol fu equity-card">
             <div className="l eq-head">
-              <span>Equity Curve <span className="meta">{vActive ? 'spot-backtested · monthly' : legFilter ? 'indicative leg · monthly' : 'net realised · monthly'}</span></span>
+              <span>Equity Curve{vActive ? <span className="meta"> spot-backtested</span> : legFilter ? <span className="meta"> indicative leg</span> : null}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(scaleInr(rangeStats.total_net_inr))}</div>
@@ -455,7 +455,7 @@ export default function Dashboard() {
           {/* Returns heatmap — full width, Monthly / Quarterly toggle */}
           <div className="t c12 flexcol fu" style={{ gridRow: heatSpan }}>
             <div className="l" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>{heatMode === 'quarter' ? 'Quarterly' : 'Monthly'} Net Returns <span className="meta">% of ₹{dispAumCr} Cr deployed · by entry {heatMode === 'quarter' ? 'quarter' : 'month'}</span></span>
+              <span>{heatMode === 'quarter' ? 'Quarterly' : 'Monthly'} Net Returns</span>
               <div className="chips" style={{ display: 'flex', gap: 6 }}>
                 <button className={'chip' + (heatMode === 'month' ? ' on' : '')} onClick={() => setHeatMode('month')}>Monthly</button>
                 <button className={'chip' + (heatMode === 'quarter' ? ' on' : '')} onClick={() => setHeatMode('quarter')}>Quarterly</button>
