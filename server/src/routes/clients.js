@@ -58,10 +58,14 @@ export async function clientsHandler(req, reply) {
     )
     const hasDirect = tradeCount[0].cnt > 0
 
-    // For clients without direct trades: derive from platform trades scaled by allocation ratio.
-    // BASE_ALLOC_CR = 30 is the deployment level the Excel trades were generated at.
+    // For clients without direct trades: derive from platform trades scaled by the DEPLOYED
+    // capital (exposure = allocation × leverage), NOT the raw allocation. BASE_ALLOC_CR = 30
+    // is the deployment level the Excel trades were generated at. So a client with 10 Cr
+    // allocation + 3× leverage deploys 30 Cr → runs the full 30 Cr strategy (P&L on 30 Cr),
+    // and its return is on the 10 Cr capital (leverage amplifies it).
     const BASE_ALLOC_CR = 30
-    const scale = hasDirect ? 1 : (primaryStrategy ? primaryStrategy.allocation_cr / BASE_ALLOC_CR : 1)
+    const deployedCr = primaryStrategy ? (primaryStrategy.exposure_cr || primaryStrategy.allocation_cr) : 0
+    const scale = hasDirect ? 1 : (deployedCr ? deployedCr / BASE_ALLOC_CR : 1)
     // joined_at date filter — only show trades on/after the client's join date
     const joinDate = primaryStrategy?.joined_at || null  // 'YYYY-MM-DD' string or null
 

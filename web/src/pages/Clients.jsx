@@ -379,11 +379,12 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
   const allocationCr = strategy?.allocation_cr ?? cl.aum_cr
   const exposureCr = strategy?.exposure_cr ?? allocationCr
   const leverage = strategy?.leverage ?? (allocationCr > 0 ? exposureCr / allocationCr : 0)
-  const aumInr = allocationCr * 1e7
+  const aumInr = allocationCr * 1e7          // capital — the base for RETURN %
+  const deployedInr = exposureCr * 1e7       // deployed (capital × leverage) — the base P&L runs on
   // Variant toggle: Options / BankNifty take the 30 Cr backtest and scale ₹ to THIS client's
-  // allocation (return %, Sharpe, DD are the strategy's own; only the ₹ amounts scale).
+  // DEPLOYED capital (exposure = allocation × leverage); return %/Sharpe/DD are the strategy's own.
   const vActive = dInstr === 'opt' ? VARIANTS.options : dIdx === 'banknifty' ? VARIANTS.banknifty : null
-  const vScale = allocationCr / (vActive?.summary.base_aum_cr || 30)
+  const vScale = exposureCr / (vActive?.summary.base_aum_cr || 30)
   const srcMonthly = vActive
     ? vActive.monthly.map(m => ({ ...m, net_inr: Math.round(m.net_inr * vScale), gross_inr: Math.round(m.net_inr * vScale), charges_inr: 0, cumulative_inr: Math.round(m.cumulative_inr * vScale) }))
     : cl.monthly
@@ -406,7 +407,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
         combined_pl_inr: Math.round(t.combined_pl_inr * vScale),
       }))
     : vKey === 'options'
-    ? VARIANT_TRADES.options.trades.map(t => ({ ...t, net_inr: Math.round(t.pct / 100 * aumInr) }))
+    ? VARIANT_TRADES.options.trades.map(t => ({ ...t, net_inr: Math.round(t.pct / 100 * deployedInr) }))
     : []
   // BankNifty charges (STT/exchange/SEBI/stamp/GST) scaled to allocation, in the live footer's shape.
   const vc = VARIANT_TRADES.banknifty.charges_inr
