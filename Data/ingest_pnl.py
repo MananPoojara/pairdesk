@@ -15,8 +15,8 @@ from psycopg2.extras import execute_values
 from datetime import date
 
 EXCEL = os.path.join(os.path.dirname(__file__),
-        "../Reference/MidCap + Nifty Pair Trading_Updated future 3-15.xlsx")
-SHEET = "P&L 30 Cr"
+        "../Reference/Future 3-15_corrected.xlsx")
+SHEET = "P&L 30 Cr_MidCap"
 
 # Local Docker Postgres by default. To seed a cloud DB (Neon/Supabase/Render),
 # set DATABASE_URL and it will be used instead.
@@ -72,9 +72,14 @@ df["date"]   = pd.to_datetime(df["Date"]).dt.date
 df["expiry"] = pd.to_datetime(df["Expiry"]).dt.date
 trades = df[["date","Symbol","expiry","Trade Type","Qty",
              "Entry Price","Exit Price","Net Profit",
-             "Total Expense","Gross Profit"]].copy()
+             "Total Expense","Gross Profit",
+             "STT","Exchange Fee","SEBI Turnover fee","Stanmp duty","GST"]].copy()
 trades.columns = ["date","symbol","expiry","direction","qty",
-                  "entry","exit","net_profit_xl","total_exp_xl","gross_xl"]
+                  "entry","exit","net_profit_xl","total_exp_xl","gross_xl",
+                  "stt_xl","exch_xl","sebi_xl","stamp_xl","gst_xl"]
+
+def _num(x):
+    return float(x) if pd.notna(x) else 0.0
 
 # Lot size per symbol = GCD of that symbol's traded quantities, so lots × lot_size
 # reproduces the EXACT quantity. The sheet uses spot-adjusted quantities that are NOT
@@ -112,7 +117,12 @@ for i, r in trades.iterrows():
         points = entry - exit_
 
     gross = points * qty
-    ch    = compute_charges(d, dirn, qty, entry, exit_)
+    # Use the sheet's ACTUAL charge columns as the source of truth. The corrected sheet's
+    # charges (stamp/exchange rates) differ from the old formula, which over-charged.
+    ch = dict(
+        stt=_num(r["stt_xl"]), exchange=_num(r["exch_xl"]), sebi=_num(r["sebi_xl"]),
+        stamp=_num(r["stamp_xl"]), gst=_num(r["gst_xl"]), total=_num(r["total_exp_xl"]),
+    )
     net   = gross - ch["total"]
 
     diff  = net - float(r["net_profit_xl"])
