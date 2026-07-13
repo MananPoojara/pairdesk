@@ -319,16 +319,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="hcard">
-            <div className="l2">Leverage <Pencil onClick={() => setEditing(true)} /></div>
-            <div className="gauge"><svg viewBox="0 0 104 56">
-              <path d="M8,51 A44,44 0 0,1 96,51" fill="none" stroke="#F2E7D6" strokeWidth="9" strokeLinecap="round" />
-              <path d={`M8,51 A44,44 0 0,1 ${gx},${gy}`} fill="none" stroke="url(#gg)" strokeWidth="9" strokeLinecap="round" />
-              <defs><linearGradient id="gg"><stop offset="0" stopColor="#F97316" /><stop offset="1" stopColor="#38BDF8" /></linearGradient></defs>
-            </svg><div className="gv">{book.leverage.toFixed(2)}×</div></div>
-            <div className="row2" style={{ marginTop: 8 }}>
-              <Mc l="Sharpe" v={dispSharpe.toFixed(2)} />
-              <Mc l="Win rate" v={dispWinRate.toFixed(0) + '%'} />
+          <div className="hcard hclient" onClick={() => setBreakdown(true)} style={{ cursor: 'pointer' }}>
+            <div className="l2">Client Mix <span className="e">{d.clients.length} · by capital ↗</span></div>
+            <div className="pcont" style={{ marginTop: 12 }}>
+              <div className="pie" style={{ background: pieBg }}><div className="c"><b>{d.clients.length}</b><small>clients</small></div></div>
+              <div className="plg">
+                <div><i style={{ background: '#F97316' }}></i>Retail <small>&lt;₹5Cr</small><b>{rPct}%</b></div>
+                <div><i style={{ background: '#38BDF8' }}></i>HNI <small>5–100Cr</small><b>{hPct}%</b></div>
+                <div><i style={{ background: '#0EA5E9' }}></i>Institution <small>&gt;100Cr</small><b>{iPct}%</b></div>
+              </div>
             </div>
           </div>
         </div>
@@ -348,6 +347,8 @@ export default function Dashboard() {
                 <MiniStat l="Best mo" cls="u" v={(dispBestMo >= 0 ? '+' : '') + dispBestMo.toFixed(2) + '%'} />
                 <MiniStat l="Worst" cls="d" v={(dispWorstMo >= 0 ? '+' : '') + dispWorstMo.toFixed(2) + '%'} />
                 <MiniStat l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(1) + '%'} />
+                <MiniStat l="Sharpe" v={dispSharpe.toFixed(2)} />
+                <MiniStat l="Win rate" cls="u" v={dispWinRate.toFixed(0) + '%'} />
               </div>
             </div>
             <div style={{ marginTop: 6 }}>
@@ -402,27 +403,13 @@ export default function Dashboard() {
 
           {/* Yearly returns */}
           <div className="t c5 r3 flexcol fu" style={{ animationDelay: '.04s' }}>
-            <div className="l">Yearly Return <span className="meta">calendar year · net</span></div>
+            <div className="l">Yearly Return</div>
             <EoyBars data={eoyReturns} />
           </div>
 
-          {/* Client mix */}
-          <div className="t c5 flexcol fu" style={{ animationDelay: '.05s', gridRow: heatSpan }}>
-            <div className="l">Client Mix <span className="meta">{d.clients.length} · by capital</span></div>
-            <div className="pcont">
-              <div className="pie" style={{ background: pieBg }}><div className="c"><b>{d.clients.length}</b><small>clients</small></div></div>
-              <div className="plg">
-                <div><i style={{ background: '#F97316' }}></i>Retail <small>&lt;₹5Cr</small><b>{rPct}%</b></div>
-                <div><i style={{ background: '#38BDF8' }}></i>HNI <small>5–100Cr</small><b>{hPct}%</b></div>
-                <div><i style={{ background: '#0EA5E9' }}></i>Institution <small>&gt;100Cr</small><b>{iPct}%</b></div>
-              </div>
-            </div>
-            <div className="va" onClick={() => setBreakdown(true)}>Open client breakdown ↗</div>
-          </div>
-
-          {/* Monthly heatmap */}
-          <div className="t c7 flexcol fu" style={{ gridRow: heatSpan }}>
-            <div className="l">Monthly Returns <span className="meta">by entry month</span></div>
+          {/* Monthly heatmap — full width */}
+          <div className="t c12 flexcol fu" style={{ gridRow: heatSpan }}>
+            <div className="l">Monthly Returns <span className="meta">% of ₹{baseAumCr} Cr deployed · by entry month</span></div>
             <Heatmap monthly={curveMonthly} compact={heatYears >= 5} />
             <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
           </div>
