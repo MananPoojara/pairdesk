@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [showBacktest, setShowBacktest] = useState(true)
   const [dIndexChip, setDIndexChip] = useState('combined')  // combined | nifty | midcap | banknifty
   const [dInstrMode, setDInstrMode] = useState('fut')        // fut | opt
+  const [heatMode, setHeatMode] = useState('month')          // month | quarter (Monthly Returns view)
 
   if (isError) return <div className="shell"><div className="crumb">⚠ Could not reach API — is the server running on :3002? ({String(error?.message)})</div></div>
   if (!d) return <div className="shell"><div className="crumb">Loading…</div></div>
@@ -442,11 +443,19 @@ export default function Dashboard() {
             <EoyBars data={eoyReturns} />
           </div>
 
-          {/* Monthly heatmap — full width */}
+          {/* Returns heatmap — full width, Monthly / Quarterly toggle */}
           <div className="t c12 flexcol fu" style={{ gridRow: heatSpan }}>
-            <div className="l">Monthly Returns <span className="meta">% of ₹{baseAumCr} Cr deployed · by entry month</span></div>
-            <Heatmap monthly={curveMonthly} compact={heatYears >= 5} />
-            <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
+            <div className="l" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{heatMode === 'quarter' ? 'Quarterly' : 'Monthly'} Returns <span className="meta">% of ₹{baseAumCr} Cr deployed · by entry {heatMode === 'quarter' ? 'quarter' : 'month'}</span></span>
+              <div className="chips" style={{ display: 'flex', gap: 6 }}>
+                <button className={'chip' + (heatMode === 'month' ? ' on' : '')} onClick={() => setHeatMode('month')}>Monthly</button>
+                <button className={'chip' + (heatMode === 'quarter' ? ' on' : '')} onClick={() => setHeatMode('quarter')}>Quarterly</button>
+              </div>
+            </div>
+            <Heatmap monthly={curveMonthly} compact={heatYears >= 5} mode={heatMode} />
+            <div className="hmx" style={heatMode === 'quarter' ? { gridTemplateColumns: '26px repeat(4,1fr)' } : undefined}>
+              <span></span>{(heatMode === 'quarter' ? ['Q1','Q2','Q3','Q4'] : ['J','F','M','A','M','J','J','A','S','O','N','D']).map((m, i) => <span key={i}>{m}</span>)}
+            </div>
           </div>
 
           {/* Latest day */}
@@ -461,42 +470,6 @@ export default function Dashboard() {
               <Cell l="Margin" v={fmtCr(baseAumCr * 0.25)} />
             </div>
           </div>
-
-          {/* Period P&L — compact stats table */}
-          {periodStat && (
-            <div className="t c12 fu pdl-tile">
-              <div className="l">Period P&amp;L <span className="meta">{vActive ? `spot-backtested · monthly net · deployed ₹${baseAumCr} Cr` : legFilter ? `indicative leg · monthly net · deployed ₹${baseAumCr} Cr` : `net = realised + unrealised on live open leg · deployed ₹${baseAumCr} Cr`}</span></div>
-              <table className="pdl-table">
-                <thead><tr>
-                  <th>Period</th><th className="num">Net PnL</th><th className="num">Realised</th><th className="num">Unrealised</th><th className="num">Trades</th><th className="num">Exposure</th><th className="num">Margin</th>
-                </tr></thead>
-                <tbody>
-                  {[
-                    { label: 'Current Month', sub: fmtMonYr(periodStat.curMonth.month), p: periodStat.curMonth, unreal: isSynthetic ? 0 : totalUnreal },
-                    { label: 'Last Month', sub: periodStat.lastMonth ? fmtMonYr(periodStat.lastMonth.month) : '—', p: periodStat.lastMonth, unreal: 0 },
-                    { label: 'Current Quarter', sub: qLabel(periodStat.cq.y, periodStat.cq.q), p: periodStat.cq, unreal: isSynthetic ? 0 : totalUnreal },
-                    { label: 'Last Quarter', sub: qLabel(periodStat.lq.y, periodStat.lq.q), p: periodStat.lq, unreal: 0 },
-                  ].map(row => {
-                    const realised = row.p ? (row.p.net_inr ?? row.p.net) : null
-                    const net = realised == null ? null : realised + (row.unreal || 0)
-                    const pct = realised == null ? null : pctOfBase(net)
-                    const trades = row.p ? (row.p.trades ?? 0) : 0
-                    return (
-                      <tr key={row.label}>
-                        <td className="pdl-p"><b>{row.label}</b><span className="pdl-sub">{row.sub}{pct != null ? ` · ${(pct >= 0 ? '+' : '') + pct.toFixed(2)}%` : ''}</span></td>
-                        <td className={'num ' + (net == null ? '' : net >= 0 ? 'u' : 'd')}>{net == null ? '—' : fmtInr(net)}</td>
-                        <td className={'num ' + (realised == null ? '' : realised >= 0 ? 'u' : 'd')}>{realised == null ? '—' : fmtInr(realised)}</td>
-                        <td className={'num ' + (row.unreal ? (row.unreal >= 0 ? 'u' : 'd') : '')}>{row.unreal ? fmtInr(row.unreal) : '₹0'}</td>
-                        <td className="num">{trades}</td>
-                        <td className="num">{fmtCr(baseAumCr)}</td>
-                        <td className="num">{fmtCr(baseAumCr * 0.25)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
 
           {/* Positions */}
           <div className="t c12 postile fu" style={{ gridRow: 'span 3' }}>
@@ -652,24 +625,37 @@ function Pencil({ onClick }) {
   return <span className="ed" style={{ color: 'var(--primary)', cursor: 'pointer' }} onClick={onClick}>✎</span>
 }
 
-function Heatmap({ monthly, compact }) {
+function Heatmap({ monthly, compact, mode = 'month' }) {
+  const quarter = mode === 'quarter'
   const map = {}
-  monthly.forEach(m => { const dt = new Date(m.month); map[`${dt.getUTCFullYear()}-${dt.getUTCMonth() + 1}`] = m.pct })
+  monthly.forEach(m => {
+    const dt = new Date(m.month)
+    const y = dt.getUTCFullYear(), mo = dt.getUTCMonth() + 1
+    if (quarter) {
+      const key = `${y}-${Math.ceil(mo / 3)}`       // quarter buckets sum the monthly % (additive)
+      map[key] = (map[key] || 0) + (m.pct || 0)
+    } else {
+      map[`${y}-${mo}`] = m.pct
+    }
+  })
   // Derive years from the data so variants (which span more years) show their full history.
   const dataYears = [...new Set((monthly || []).map(m => String(m.month).slice(0, 4)))].sort()
   const years = dataYears.length ? dataYears : ['2024', '2025', '2026']
+  const n = quarter ? 4 : 12
   return (
-    <div className={'hm' + (compact ? ' hm-compact' : '')}>
+    <div className={'hm' + (quarter ? ' hm-q' : '') + (compact ? ' hm-compact' : '')}
+      style={quarter ? { gridTemplateColumns: '26px repeat(4,1fr)' } : undefined}>
       {years.flatMap(y => {
         const cells = [<div key={y + '-yl'} className="yl">{"'" + y.slice(2)}</div>]
-        for (let mo = 1; mo <= 12; mo++) {
-          const key = `${y}-${mo}`
+        for (let i = 1; i <= n; i++) {
+          const key = `${y}-${i}`
           const pct = key in map ? map[key] : null
           const lbl = pct === null ? '' : (pct >= 0 ? '+' : '−') + Math.abs(pct).toFixed(2) + '%'
           const tip = pct === null ? 'No data' : (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%'
+          const label = quarter ? `${y} Q${i}` : `${y}-${i < 10 ? '0' : ''}${i}`
           cells.push(
             <div key={key} className="cell" style={{ background: hmColor(pct), color: hmText(pct) }}
-              title={`${y}-${mo < 10 ? '0' : ''}${mo}: ${tip}`}>{lbl}</div>
+              title={`${label}: ${tip}`}>{lbl}</div>
           )
         }
         return cells

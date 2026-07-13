@@ -29,7 +29,7 @@ export default function Clients() {
   const { data: dash } = useQuery({ queryKey: ['dashboard'], queryFn: () => apiGet('/api/dashboard') })
   const [openCode, setOpenCode] = useState(null)
   const [q, setQ] = useState('')
-  const [selectedCat, setSelectedCat] = useState('HNI')
+  const [selectedCat, setSelectedCat] = useState(null)   // null = all categories
   const [editClient, setEditClient] = useState(null)
 
   const tk = {
@@ -68,34 +68,35 @@ export default function Clients() {
           let shown = data.clients.filter(c => !ql || c.name.toLowerCase().includes(ql) || c.code.toLowerCase().includes(ql))
           if (selectedCat) shown = shown.filter(c => c.category === selectedCat)
           if (ql && !shown.length) return <div className="crumb" style={{ padding: '24px 2px' }}>No clients match &ldquo;{q}&rdquo;.</div>
+          // one unified list across all categories, sorted by category then capital
+          shown = [...shown].sort((a, b) =>
+            CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category) || (b.aum_cr - a.aum_cr))
+          const openCl = shown.find(c => c.code === openCode)
           return (
-          <div>
-            {CAT_ORDER.map(cat => {
-              const cats = shown.filter(c => c.category === cat)
-              if (!cats.length) return null
-              const info = data.summary.categories[cat]
-              const cls = CAT_CLS[cat]
-              const openCl = cats.find(c => c.code === openCode)
-              return (
-                <div className="cat-section" key={cat}>
-                  <div className="sechd"><b>{cat}</b>
-                    <span className={'chiplbl ' + cls}>{CAT_RANGE[cat]}</span>
-                    <span className="ct">{info.count} client{info.count !== 1 ? 's' : ''} · ₹{info.aum_cr.toFixed(1)} Cr</span>
-                    <div className="ln"></div>
-                  </div>
-                  <div className="crow">
-                    {cats.map((c, idx) => (
-                      <ClientCard key={c.code} c={c} cls={cls} cat={cat} idx={idx}
-                        active={c.code === openCode}
-                        onToggle={() => setOpenCode(openCode === c.code ? null : c.code)}
-                        onEdit={() => setEditClient(c)} />
-                    ))}
-                  </div>
-                  {openCl && <Drawer cl={openCl} backtest={dash?.backtest?.series} backtestBaseAum={dash?.backtest?.base_aum_cr ?? 30} onClose={() => setOpenCode(null)} />}
+            <>
+              <div className="client-list-wrap fu">
+                <div className="clist-head">
+                  <span>{shown.length} client{shown.length !== 1 ? 's' : ''} · {selectedCat || 'all categories'}</span>
+                  <span className="clist-hint">click a row for the full breakdown</span>
                 </div>
-              )
-            })}
-          </div>
+                <div className="tscroll clist-scroll">
+                  <table className="clist">
+                    <thead><tr>
+                      <th>Start date</th><th>Client</th><th>Type</th>
+                      <th className="num">Capital</th><th className="num">P&amp;L</th><th className="num">Current value</th>
+                      <th className="num">Return</th><th className="num">Leverage</th><th aria-label="expand"></th>
+                    </tr></thead>
+                    <tbody>
+                      {shown.map(c => (
+                        <ClientRow key={c.code} c={c} active={c.code === openCode}
+                          onClick={() => setOpenCode(openCode === c.code ? null : c.code)} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {openCl && <Drawer cl={openCl} backtest={dash?.backtest?.series} backtestBaseAum={dash?.backtest?.base_aum_cr ?? 30} onClose={() => setOpenCode(null)} />}
+            </>
           )
         })()}
       </div>
@@ -342,6 +343,29 @@ function ClientCard({ c, cls, cat, idx, active, onToggle, onEdit }) {
         ● Pair Trading<span className="arr">▾</span>
       </span>
     </div>
+  )
+}
+
+function ClientRow({ c, active, onClick }) {
+  const strategy = primaryStrategy(c)
+  const capCr = strategy?.allocation_cr ?? c.aum_cr
+  const lev = strategy?.leverage ?? (capCr > 0 ? (strategy?.exposure_cr ?? capCr) / capCr : 1)
+  const net = c.stats.net_inr
+  const curValCr = capCr + net / 1e7                 // current valuation = capital + P&L
+  const nc = net >= 0 ? 'u' : 'd'
+  const instr = 'F2F'                                 // futures pair (F2O = fut × option variant)
+  return (
+    <tr className={'clist-row' + (active ? ' active' : '')} onClick={onClick}>
+      <td className="m">{fDate(c.joined_at)}</td>
+      <td><div className="clr-name"><b>{c.name}</b><span className={'chiplbl sm ' + CAT_CLS[c.category]}>{CAT_LBL[c.category]}</span></div></td>
+      <td><span className="instr-chip" title="Futures pair (Midcap fut × Nifty fut)">{instr}</span></td>
+      <td className="num m">{fCr(capCr)}</td>
+      <td className={'num m ' + nc}>{fL(net)}</td>
+      <td className="num m"><b>{fCr(curValCr)}</b></td>
+      <td className={'num m ' + nc}>{pctStr(c.stats.return_pct)}</td>
+      <td className="num m">{fmtLev(lev)}</td>
+      <td className="num clr-caret">{active ? '▲' : '▸'}</td>
+    </tr>
   )
 }
 

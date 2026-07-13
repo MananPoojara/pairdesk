@@ -116,3 +116,29 @@
 .pg-clients .var-bar .chip:hover{border-color:var(--primary);color:var(--primary)}
 .pg-clients .var-bar .chip.on{background:linear-gradient(135deg,var(--primary),var(--accent));border-color:transparent;color:#fff}
 .pg-clients .var-bar .chip:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
+
+/* ── Client list table (row-per-client, click a row → drawer) ─────────────── */
+.pg-clients .client-list-wrap{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:hidden}
+.pg-clients .clist-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--text)}
+.pg-clients .clist-head .clist-hint{color:var(--muted);font-weight:600;font-size:11px}
+.pg-clients .clist-scroll{max-height:none;overflow-x:auto;margin:0}
+.pg-clients table.clist{width:100%;border-collapse:collapse;font-size:13px}
+.pg-clients table.clist thead th{text-align:left;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:11px 16px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--soft)}
+.pg-clients table.clist thead th.num{text-align:right}
+.pg-clients table.clist td{padding:15px 16px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;color:var(--text)}
+.pg-clients table.clist td.num{text-align:right;font-family:'JetBrains Mono';font-weight:600}
+.pg-clients table.clist td.num.u{color:#0E9F6E}
+.pg-clients table.clist td.num.d{color:#E02424}
+.pg-clients table.clist tbody tr:last-child td{border-bottom:0}
+.pg-clients .clist-row{cursor:pointer;transition:background .12s}
+.pg-clients .clist-row:hover{background:#FFF7EF}
+.pg-clients .clist-row.active{background:linear-gradient(120deg,#FFF4E9,#EAF7FE)}
+.pg-clients .clist-row.active td{border-bottom-color:var(--accent)}
+.pg-clients .clr-name{display:flex;align-items:center;gap:9px}
+.pg-clients .clr-name b{font-family:'Familjen Grotesk';font-weight:700;font-size:14px}
+.pg-clients .clist .chiplbl.sm{width:auto;padding:2px 7px;font-size:9px}
+.pg-clients .instr-chip{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:.03em;background:#EAF7FE;color:#0369A1}
+.pg-clients .clr-caret{color:var(--primary);font-weight:800;width:22px;text-align:center}
+
+/* Bigger tradesheet inside the client drawer */
+.pg-clients .d-trades .tscroll{max-height:460px}
