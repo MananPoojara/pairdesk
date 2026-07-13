@@ -14,7 +14,7 @@ export default function AppShell({ children }) {
   return (
     <>
       <header className="appbar"><div className="in">
-        <div className="brand"><span className="brand-logo"><img src="/logo.png" alt="Young Turtle" /></span></div>
+        <div className="brand"><div className="o">Y</div><b>Young Turtle</b></div>
         <nav className="inav">
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} end={n.end}

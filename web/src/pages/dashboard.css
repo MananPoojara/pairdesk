@@ -142,6 +142,3 @@ tbody td{padding:11px 13px;border-bottom:1px solid #F4ECDF}tbody tr:hover{backgr
 .pg-dash .hm-compact .cell{height:28px;font-size:11px}
 .pg-dash .hm-compact{gap:3px}
 .pg-dash .postile .pair-cell{border-left:1px solid var(--line);background:#FCFAF6}
-/* Header brand — white Young Turtle logo on an orange plate so it stays visible */
-.brand-logo{display:inline-flex;align-items:center;background:linear-gradient(135deg,var(--primary),var(--accent));border-radius:11px;padding:7px 14px;box-shadow:0 3px 10px -3px rgba(249,115,22,.45)}
-.brand-logo img{height:26px;display:block;width:auto}
