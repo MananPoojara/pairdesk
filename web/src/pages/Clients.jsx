@@ -639,14 +639,13 @@ function TradesTable({ trades }) {
   return (
     <div className="tscroll" style={{ margin: '8px 8px 12px' }}>
       <table><thead><tr>
-        <th>Date</th><th>Symbol</th><th>Side</th><th className="num">Size</th>
+        <th>Date</th><th>Symbol</th><th className="num">Size</th>
         <th className="num">Entry</th><th className="num">Exit</th><th className="num">Points</th><th className="num">Net PnL</th>
         <th className="num">Combined P/L</th><th className="num">Combined %</th>
       </tr></thead><tbody>
         {trades.map((t, i) => {
           const nc = t.net_inr >= 0 ? 'u' : 'd'
           const cc = t.combined_pl_inr >= 0 ? 'u' : 'd'
-          const dc = t.direction === 'LONG' ? 'l' : 's'
           const pts = t.direction === 'LONG' ? (t.exit - t.entry).toFixed(2) : (t.entry - t.exit).toFixed(2)
           // The pair's combined P/L & % are identical on both legs — show them once,
           // merged across the two rows of the pair. A pair's legs share an EXPIRY MONTH
@@ -659,7 +658,6 @@ function TradesTable({ trades }) {
             <tr key={i}>
               <td className="m">{fDate(t.date)}</td>
               <td>{t.underlying}</td>
-              <td><span className={'tg2 ' + dc}>{t.direction}</span></td>
               <td className="num m">{t.lots} lots</td>
               <td className="num m">{fmtNum(t.entry)}</td>
               <td className="num m">{fmtNum(t.exit)}</td>
