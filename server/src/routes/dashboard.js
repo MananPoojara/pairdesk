@@ -45,7 +45,9 @@ export async function dashboardHandler(req, reply) {
   const { rows: monthly } = await query(`
     WITH m AS (
       SELECT
-        to_char(date_trunc('month', t.trade_date), 'YYYY-MM-01') AS month,
+        -- Book each cycle's P&L in its EXPIRY month (when it's realised), not the entry month —
+        -- so the May-entry / June-expiry cycle shows up as June.
+        to_char(date_trunc('month', t.expiry), 'YYYY-MM-01') AS month,
         COUNT(*) AS trades,
         SUM(
           CASE WHEN t.direction='LONG'

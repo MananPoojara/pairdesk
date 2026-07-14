@@ -74,7 +74,7 @@ export async function clientsHandler(req, reply) {
       ? await query(`
           WITH m AS (
             SELECT
-              to_char(date_trunc('month', t.trade_date), 'YYYY-MM-01') AS month,
+              to_char(date_trunc('month', t.expiry), 'YYYY-MM-01') AS month,   -- expiry month (realised)
               SUM(
                 CASE WHEN t.direction = 'LONG'
                      THEN (t.exit_price - t.entry_price) * t.lots * t.lot_size
@@ -97,7 +97,7 @@ export async function clientsHandler(req, reply) {
       : await query(`
           WITH m AS (
             SELECT
-              to_char(date_trunc('month', t.trade_date), 'YYYY-MM-01') AS month,
+              to_char(date_trunc('month', t.expiry), 'YYYY-MM-01') AS month,   -- expiry month (realised)
               SUM(
                 CASE WHEN t.direction = 'LONG'
                      THEN (t.exit_price - t.entry_price) * t.lots * t.lot_size
