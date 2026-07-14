@@ -305,14 +305,19 @@ export default function Strategies() {
             </div>
           </div>
 
-          {/* MoM heatmap + table */}
-          <div className="panel c7 flexcol">
+          {/* MoM heatmap — full width so the cells are wide like the dashboard */}
+          <div className="panel c12 flexcol">
             <div className="sechd">Month-on-Month Net % <span className="meta">net return · % of AUM</span></div>
-            <div style={{ padding: '0 16px' }}>
+            <div style={{ padding: '4px 16px 12px' }}>
               <Heatmap monthly={curveMonthly} />
               <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
             </div>
-            <div className="tscroll" style={{ marginTop: 8 }}>
+          </div>
+
+          {/* Monthly detail table */}
+          <div className="panel c5 flexcol">
+            <div className="sechd">Monthly detail <span className="meta">net return · %</span></div>
+            <div className="tscroll" style={{ marginTop: 4 }}>
               <table>
                 <thead><tr><th>Month</th><th className="num">Net %</th></tr></thead>
                 <tbody>
@@ -328,7 +333,7 @@ export default function Strategies() {
           </div>
 
           {/* YoY table */}
-          <div className="panel c5 flexcol">
+          <div className="panel c7 flexcol">
             <div className="sechd">Year-on-Year <span className="meta">PnL in ₹ &amp; %</span></div>
             <div className="tscroll" style={{ marginTop: 4 }}>
               <table>
