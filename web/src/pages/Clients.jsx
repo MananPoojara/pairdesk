@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPatch } from '../api/client'
+import MarketTickers from '../components/MarketTickers'
 import { fCr, fCr1, fL, pctStr, fDate, fMonSh } from '../lib/clientsFmt'
 import {
   cellClr, cellTxt, cellLbl,
@@ -41,9 +42,8 @@ export default function Clients() {
   return (
     <div className="pg-clients">
       <div className="subbar"><div className="in">
-        <div className="ti"><span className="n">NIFTY 50</span><span className="v">{tk.nifty ? fmtNum(tk.nifty) : '—'}</span></div>
-        <div className="ti"><span className="n">MIDCAP SELECT</span><span className="v">{tk.mid ? fmtNum(tk.mid) : '—'}</span></div>
-        <div className="ti"><span className="n">Data as of</span><span className="v">{tk.date || '—'}</span></div>
+        <MarketTickers dash={dash} />
+        <div className="ti"><span className="n">Data as of</span><span className="v">{dash?.latest_date || '—'}</span></div>
         <div className="rt"><div className="seg"><button className="on">All time</button><button>YTD</button><button>MTD</button></div></div>
       </div></div>
 

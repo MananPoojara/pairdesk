@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../api/client'
 import DateRangeControl from '../components/DateRangeControl'
+import MarketTickers from '../components/MarketTickers'
 import { fmtInr, fmtCr, fmtDate, fmtNum } from '../lib/format'
 import { buildCurvePath, hmColor, hmText } from '../lib/curve'
 import {
@@ -230,25 +231,8 @@ export default function Dashboard() {
     <Frame>
       {/* subbar ticker + controls */}
       <div className="subbar"><div className="in">
-        <Ticker name="NIFTY 50" p={niftyPos} />
-        <Ticker name="MIDCAP SELECT" p={midPos} />
-        <div className="ti"><span className="n">PAIR SPREAD</span>
-          <span className="v">{(spreadPct >= 0 ? '+' : '') + spreadPct.toFixed(2)}%</span>
-          <span className={'c ' + (spreadPct >= 0 ? 'u' : 'd')}>{spreadPct >= 0 ? '▲' : '▼'}</span>
-        </div>
+        <MarketTickers dash={d} />
         <div className="rt">
-          <div className="gl" style={{ background: '#fff', padding: '6px 11px', position: 'relative' }}
-            onClick={e => { e.stopPropagation(); setIdxOpen(o => !o) }}>
-            <span>{idx}</span> ▾
-            {idxOpen && (
-              <div className="menu" style={{ top: 38, right: 0 }}>
-                {IDX.map(o => (
-                  <button key={o} className={o === idx ? 'on' : undefined}
-                    onClick={e => { e.stopPropagation(); setIdx(o); setIdxOpen(false) }}>{o}</button>
-                ))}
-              </div>
-            )}
-          </div>
           <DateRangeControl
             range={range}
             startDate={startDate}

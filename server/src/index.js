@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { pool } from './db/pg.js'
 import { duckQuery, PARQUET } from './db/duck.js'
-import { dashboardHandler } from './routes/dashboard.js'
+import { dashboardHandler, readTickers } from './routes/dashboard.js'
 import { clientsHandler } from './routes/clients.js'
 import { ordersHandler  } from './routes/orders.js'
 import { strategiesHandler } from './routes/strategies.js'
@@ -25,6 +25,7 @@ app.get('/health', async () => {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 app.get('/api/dashboard', dashboardHandler)
+app.get('/api/tickers', async () => readTickers() || {})   // live index LTP, polled every 60s
 app.get('/api/clients', clientsHandler)
 app.post('/api/clients', createClientHandler)
 app.patch('/api/clients/:code/capital', updateClientCapitalHandler)

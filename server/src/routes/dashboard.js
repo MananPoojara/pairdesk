@@ -1,6 +1,16 @@
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import { query } from '../db/pg.js'
 import { duckQuery, PARQUET } from '../db/duck.js'
 import { pairReferenceStats, spotBacktest, SPOT_BACKTEST_BASE_AUM_CR } from '../data/spotBacktest.js'
+
+// Live index tickers (NIFTY 50 / MIDCAP SELECT / NIFTY BANK) from Angel One EOD, refreshed by
+// `python3 Data/fetch_tickers.py`. Read per-request so a re-run updates without a server restart.
+const TICKERS_PATH = join(dirname(fileURLToPath(import.meta.url)), '../data/tickers.json')
+export function readTickers() {
+  try { return JSON.parse(readFileSync(TICKERS_PATH, 'utf8')) } catch { return null }
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmtCr  = n => Math.round(n * 100) / 100   // 2dp Cr
@@ -315,5 +325,6 @@ export async function dashboardHandler(req, reply) {
       label:   new Date(rolloverExpiry).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(/ /g,' '),
     },
     latest_date: todayDayStr,   // last actual TRADE day (e.g. 2026-06-30), for the subtitle + chart end
+    tickers: readTickers(),     // live NIFTY 50 / MIDCAP SELECT / NIFTY BANK EOD (Angel One)
   }
 }

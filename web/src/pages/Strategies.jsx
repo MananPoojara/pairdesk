@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../api/client'
 import DateRangeControl from '../components/DateRangeControl'
+import MarketTickers from '../components/MarketTickers'
 import { buildCurvePath, hmColor, hmText } from '../lib/curve'
 import { fmtNum } from '../lib/format'
 import {
@@ -135,8 +136,7 @@ export default function Strategies() {
   return (
     <div className="pg-strategies">
       <div className="subbar"><div className="in">
-        <Ticker name="NIFTY 50" p={tk.nifty} />
-        <Ticker name="MIDCAP SELECT" p={tk.mid} />
+        <MarketTickers dash={dash} />
         <div className="ti"><span className="n">Data as of</span><span className="v">{dash?.latest_date || '—'}</span></div>
         <div className="rt">
           <DateRangeControl

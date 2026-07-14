@@ -22,3 +22,4 @@ server/*.txt
 # misc
 .DS_Store
 *.log
+server/src/data/tickers.json
