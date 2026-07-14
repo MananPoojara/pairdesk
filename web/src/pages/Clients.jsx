@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPatch } from '../api/client'
 import MarketTickers from '../components/MarketTickers'
@@ -89,14 +89,22 @@ export default function Clients() {
                     </tr></thead>
                     <tbody>
                       {shown.map(c => (
-                        <ClientRow key={c.code} c={c} active={c.code === openCode}
-                          onClick={() => setOpenCode(openCode === c.code ? null : c.code)} />
+                        <Fragment key={c.code}>
+                          <ClientRow c={c} active={c.code === openCode}
+                            onClick={() => setOpenCode(openCode === c.code ? null : c.code)} />
+                          {openCode === c.code && openCl && (
+                            <tr className="drawer-row">
+                              <td colSpan={9} style={{ padding: '0 12px', borderBottom: 0 }}>
+                                <Drawer cl={openCl} backtest={dash?.backtest?.series} backtestBaseAum={dash?.backtest?.base_aum_cr ?? 30} onClose={() => setOpenCode(null)} />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-              {openCl && <Drawer cl={openCl} backtest={dash?.backtest?.series} backtestBaseAum={dash?.backtest?.base_aum_cr ?? 30} onClose={() => setOpenCode(null)} />}
             </>
           )
         })()}
