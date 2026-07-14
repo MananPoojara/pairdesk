@@ -44,13 +44,13 @@ function AddClientModal({ onClose, onSaved }) {
   const [joinedAt, setJoinedAt] = useState(today)
   // INR raw strings with commas for display
   const [aumInr, setAumInr] = useState('')
-  const [allocInr, setAllocInr] = useState('')
   const [expoInr, setExpoInr] = useState('')
   const [leverage, setLeverage] = useState('1')
   const [brokeragePct, setBrokeragePct] = useState('0')
   const [taxPct, setTaxPct] = useState('0')
   const [execType, setExecType] = useState('F2F')     // F2F (fut×fut) | F2O (fut×option)
-  const [cashInr, setCashInr] = useState('')          // cash share of allocation (rest = stock pledge)
+  const [cashInr, setCashInr] = useState('')          // cash component of allocation
+  const [pledgeInr, setPledgeInr] = useState('')      // stock-pledge component (allocation = cash + pledge)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -61,33 +61,35 @@ function AddClientModal({ onClose, onSaved }) {
     setter(fmtInrRaw(digits))
   }
 
-  function syncAlloc(next) {
-    handleInrInput(next, setAllocInr)
-    const alloc = fieldNum(parseInr(next)), lev = fieldNum(leverage)
-    setExpoInr(fmtInrRaw(String(Math.round(alloc * lev))))
+  // Allocation is derived = cash + stock pledge. Exposure defaults to allocation × leverage.
+  function recalcExpo(cashStr, pledgeStr, lev) {
+    const alloc = fieldNum(parseInr(cashStr)) + fieldNum(parseInr(pledgeStr))
+    setExpoInr(fmtInrRaw(String(Math.round(alloc * fieldNum(lev)))))
+  }
+
+  function syncCash(next) {
+    handleInrInput(next, setCashInr)
+    recalcExpo(next, pledgeInr, leverage)
+  }
+
+  function syncPledge(next) {
+    handleInrInput(next, setPledgeInr)
+    recalcExpo(cashInr, next, leverage)
   }
 
   function syncExpo(next) {
     handleInrInput(next, setExpoInr)
-    const alloc = fieldNum(parseInr(allocInr)), expo = fieldNum(parseInr(next))
+    const alloc = fieldNum(parseInr(cashInr)) + fieldNum(parseInr(pledgeInr)), expo = fieldNum(parseInr(next))
     setLeverage(fixedInput(alloc > 0 ? expo / alloc : 0, 4))
   }
 
   function syncLev(next) {
     setLeverage(next)
-    const alloc = fieldNum(parseInr(allocInr)), lev = fieldNum(next)
-    setExpoInr(fmtInrRaw(String(Math.round(alloc * lev))))
+    recalcExpo(cashInr, pledgeInr, next)
   }
 
   function handleAum(raw) {
-    const digits = raw.replace(/[^0-9]/g, '')
-    const fmt = fmtInrRaw(digits)
-    setAumInr(fmt)
-    if (!allocInr) {
-      setAllocInr(fmt)
-      const alloc = fieldNum(digits), lev = fieldNum(leverage)
-      setExpoInr(fmtInrRaw(String(Math.round(alloc * lev))))
-    }
+    handleInrInput(raw, setAumInr)
   }
 
   async function save() {
@@ -96,15 +98,16 @@ function AddClientModal({ onClose, onSaved }) {
     if (!code.trim()) { setErr('Client code is required.'); return }
     const aumRaw = fieldNum(parseInr(aumInr))
     if (!aumRaw || aumRaw <= 0) { setErr('Total capital must be greater than zero.'); return }
-    const allocRaw = allocInr !== '' ? fieldNum(parseInr(allocInr)) : aumRaw
+    const cashRaw = fieldNum(parseInr(cashInr))
+    const pledgeRaw = fieldNum(parseInr(pledgeInr))
+    const allocRaw = cashRaw + pledgeRaw                                       // allocation = cash + stock pledge
     const expoRaw  = expoInr !== '' ? fieldNum(parseInr(expoInr)) : allocRaw
     const lev = leverage !== '' ? Number(leverage) : 1
     const brok = Number(brokeragePct) || 0
     const tax  = Number(taxPct) || 0
-    const cashRaw = cashInr !== '' ? fieldNum(parseInr(cashInr)) : allocRaw   // default: all cash
-    const pledgeRaw = Math.max(0, allocRaw - cashRaw)
-    if (allocRaw < 0 || allocRaw > aumRaw) { setErr('Allocation must be between 0 and total capital.'); return }
-    if (cashRaw < 0 || cashRaw > allocRaw) { setErr('Cash must be between 0 and the strategy allocation.'); return }
+    if (cashRaw < 0 || pledgeRaw < 0) { setErr('Cash and stock pledge must be ≥ 0.'); return }
+    if (allocRaw <= 0) { setErr('Enter cash and/or stock pledge — allocation must be greater than zero.'); return }
+    if (allocRaw > aumRaw) { setErr('Cash + stock pledge cannot exceed total capital.'); return }
     if (expoRaw < 0) { setErr('Exposure must be >= 0.'); return }
     if (lev < 0 || lev > 10) { setErr('Leverage must be between 0× and 10×.'); return }
     if (brok < 0 || brok > 100) { setErr('Brokerage % must be between 0 and 100.'); return }
@@ -133,11 +136,11 @@ function AddClientModal({ onClose, onSaved }) {
     }
   }
 
-  const allocNum = fieldNum(parseInr(allocInr || aumInr))
-  const expoNum  = fieldNum(parseInr(expoInr || allocInr || aumInr))
-  const levVal   = allocNum > 0 ? expoNum / allocNum : 0
-  const cashNum  = cashInr !== '' ? fieldNum(parseInr(cashInr)) : allocNum
-  const pledgeNum = Math.max(0, allocNum - cashNum)
+  const cashNum   = fieldNum(parseInr(cashInr))
+  const pledgeNum = fieldNum(parseInr(pledgeInr))
+  const allocNum  = cashNum + pledgeNum
+  const expoNum   = fieldNum(parseInr(expoInr)) || allocNum
+  const levVal    = allocNum > 0 ? expoNum / allocNum : 0
 
   // Portal to <body> so the fixed overlay isn't trapped by the shell's animation transform
   // (an identity `transform` on an ancestor makes position:fixed anchor to it, not the viewport).
@@ -174,17 +177,20 @@ function AddClientModal({ onClose, onSaved }) {
               <input type="date" value={joinedAt} onChange={e => setJoinedAt(e.target.value)} />
             </div>
           </div>
-          <div className="field"><label>Strategy allocation (₹)</label>
-            <input placeholder={aumInr || 'e.g. 5,00,000'} value={allocInr} onChange={e => syncAlloc(e.target.value)} />
-            {allocInr && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{(fieldNum(parseInr(allocInr)) / INR_TO_CR).toFixed(4)} Cr</div>}
+          <div style={{ display: 'flex', gap: 14 }}>
+            <div className="field" style={{ flex: 1 }}><label>Cash (₹)</label>
+              <input placeholder="e.g. 4,00,000" value={cashInr} onChange={e => syncCash(e.target.value)} />
+              {cashInr && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{(cashNum / INR_TO_CR).toFixed(4)} Cr</div>}
+            </div>
+            <div className="field" style={{ flex: 1 }}><label>Stock Pledge (₹)</label>
+              <input placeholder="e.g. 6,00,000" value={pledgeInr} onChange={e => syncPledge(e.target.value)} />
+              {pledgeInr && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{(pledgeNum / INR_TO_CR).toFixed(4)} Cr</div>}
+            </div>
           </div>
-          <div className="field"><label>Cash (₹) <span style={{ fontWeight: 400, fontSize: 10.5, color: 'var(--muted)' }}>· remainder of allocation is stock pledge · base for Return-on-Cash</span></label>
-            <input placeholder={allocInr || aumInr || 'e.g. 4,00,000'} value={cashInr} onChange={e => handleInrInput(e.target.value, setCashInr)} />
-            <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>Cash {(cashNum / INR_TO_CR).toFixed(2)} Cr · Stock pledge {(pledgeNum / INR_TO_CR).toFixed(2)} Cr</div>
-          </div>
+          {allocNum > 0 && <div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 600, margin: '-2px 0 12px' }}>Allocation = Cash + Stock Pledge = <b style={{ color: 'var(--text)' }}>₹{(allocNum / INR_TO_CR).toFixed(2)} Cr</b></div>}
           <div style={{ display: 'flex', gap: 14 }}>
             <div className="field" style={{ flex: 1 }}><label>Strategy exposure (₹)</label>
-              <input placeholder={allocInr || aumInr || '0'} value={expoInr} onChange={e => syncExpo(e.target.value)} />
+              <input placeholder={aumInr || '0'} value={expoInr} onChange={e => syncExpo(e.target.value)} />
             </div>
             <div className="field" style={{ flex: 1 }}><label>Leverage (×)</label>
               <input type="number" min="0" max="10" step="0.01" value={leverage} onChange={e => syncLev(e.target.value)} />
