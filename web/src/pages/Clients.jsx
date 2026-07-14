@@ -459,7 +459,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           <Hk l="Win months" v={stats.wins + ' / ' + stats.total_months} />
         </div>
 
-        <EquityCurve monthly={filtered} allocationCr={allocationCr} backtest={vActive ? null : backtest} backtestBaseAum={backtestBaseAum} />
+        <EquityCurve monthly={filtered} allocationCr={allocationCr} deployedCr={exposureCr} backtest={vActive ? null : backtest} backtestBaseAum={backtestBaseAum} />
 
         <div className="d-sec">
           <div className="d-sec-l">Month-on-Month Net Returns · % of strategy allocation</div>
@@ -704,16 +704,17 @@ function Heatmap({ monthly }) {
   )
 }
 
-function EquityCurve({ monthly, allocationCr, backtest, backtestBaseAum }) {
+function EquityCurve({ monthly, allocationCr, deployedCr, backtest, backtestBaseAum }) {
   const svgRef = useRef(null)
   const wrapRef = useRef(null)
   const [tip, setTip] = useState(null)
   const [showBacktest, setShowBacktest] = useState(true)
   const domain = equityDomain(monthly?.[0]?.month, monthly?.[monthly.length - 1]?.month, monthly)
   const liveRows = (monthly || []).map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
-  // Scale the spot backtest to THIS client's allocation (same scale as the live curve),
-  // and include it in the value domain so it never overflows the panel.
-  const backtestRows = buildBacktestRows(backtest, domain, allocationCr || backtestBaseAum || 30)
+  // Scale the spot backtest to THIS client's DEPLOYED capital (exposure = allocation × leverage) —
+  // the SAME base the live P&L curve runs on — so the gap between the two lines is the real
+  // spot-vs-fut difference, not a leverage-scale mismatch. Falls back to allocation if no leverage.
+  const backtestRows = buildBacktestRows(backtest, domain, deployedCr || allocationCr || backtestBaseAum || 30)
   const valueDomain = equityValueDomain(liveRows, backtestRows)
   const livePath = buildDateCurvePath(liveRows, domain, valueDomain, CURVE_W, CURVE_H, CURVE_PAD)
   const livePts = dateLinePoints(liveRows, domain, valueDomain, CURVE_W, CURVE_H, CURVE_PAD)
