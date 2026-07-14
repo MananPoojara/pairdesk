@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiDelete, apiPost } from '../api/client'
 import rawHtml from './admin.body.html?raw'
@@ -138,11 +139,13 @@ function AddClientModal({ onClose, onSaved }) {
   const cashNum  = cashInr !== '' ? fieldNum(parseInr(cashInr)) : allocNum
   const pledgeNum = Math.max(0, allocNum - cashNum)
 
-  return (
+  // Portal to <body> so the fixed overlay isn't trapped by the shell's animation transform
+  // (an identity `transform` on an ancestor makes position:fixed anchor to it, not the viewport).
+  return createPortal(
     <div className="overlay" onClick={e => { if (e.target.classList.contains('overlay')) onClose() }}>
-      <div className="modal">
+      <div className="modal modal-form">
         <div className="mh"><b>Add client</b><span className="x" onClick={onClose}>×</span></div>
-        <div style={{ padding: '18px 22px' }}>
+        <div className="modal-body">
           <div className="field"><label>Client name</label>
             <input placeholder="e.g. Manan Pujara" value={name} onChange={e => handleName(e.target.value)} autoFocus />
           </div>
@@ -200,13 +203,14 @@ function AddClientModal({ onClose, onSaved }) {
             {allocNum > 0 && <span style={{ marginLeft: 12 }}>· Lev {levVal.toFixed(2)}× · Exp ₹{fmtInrRaw(String(Math.round(expoNum)))}</span>}
           </div>
           {err && <div style={{ color: 'var(--neg)', fontSize: 12, fontWeight: 700, marginTop: 10 }}>{err}</div>}
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
-            <button className="btn ghost" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Add client'}</button>
-          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Add client'}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

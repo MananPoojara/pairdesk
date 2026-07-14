@@ -168,21 +168,28 @@ td.num,th.num{text-align:right}
 .tg2.l{background:#E0F4FE;color:#0369A1}.tg2.s{background:#FBEAE1;color:#9A3412}
 
 /* ---------- forms (broker / admin) ---------- */
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
 .field label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.field input,.field select{font-family:inherit;font-size:13.5px;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none}
-.field input:focus,.field select:focus{border-color:var(--primary);background:#fff}
+.field input,.field select{font-family:inherit;font-size:13.5px;font-weight:600;color:var(--text);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus{border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px rgba(249,115,22,.12)}
+.field input::placeholder{color:#B8AC98}
 .toggle{width:42px;height:24px;border-radius:14px;background:#E3D6C4;position:relative;cursor:pointer;transition:.2s}
 .toggle.on{background:linear-gradient(135deg,var(--primary),var(--accent))}
 .toggle::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
 .toggle.on::after{left:21px}
 
 /* ---------- popup / modal (client pie breakdown etc.) ---------- */
-.overlay{position:fixed;inset:0;background:rgba(31,27,22,.42);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:50}
-.modal{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px -30px rgba(31,27,22,.5);width:min(680px,92vw);max-height:84vh;overflow:auto}
+.overlay{position:fixed;inset:0;background:rgba(23,20,16,.55);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;padding:5vh 20px;overflow-y:auto;z-index:50}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px -24px rgba(23,20,16,.55);width:min(680px,92vw);max-height:84vh;overflow:auto;margin:auto}
 .modal .mh{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
 .modal .mh b{font-family:'Familjen Grotesk';font-weight:700;font-size:17px;margin-right:auto}
-.modal .mh .x{cursor:pointer;color:var(--muted);font-weight:700;font-size:18px}
+.modal .mh .x{cursor:pointer;color:var(--muted);font-weight:700;font-size:18px;line-height:1;padding:2px 6px;border-radius:8px;transition:background .15s}
+.modal .mh .x:hover{background:var(--soft);color:var(--text)}
+/* form modal: fixed header + scrollable body + sticky footer so it never overflows the viewport */
+.modal.modal-form{display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
+.modal-form .mh{flex-shrink:0}
+.modal-form .modal-body{padding:16px 22px 4px;overflow-y:auto;flex:1 1 auto}
+.modal-form .modal-foot{flex-shrink:0;display:flex;gap:10px;justify-content:flex-end;padding:14px 22px;border-top:1px solid var(--line);background:var(--panel)}
 
 /* scrollbar + footer note */
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#EBD9C4;border-radius:8px}
