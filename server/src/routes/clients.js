@@ -28,7 +28,7 @@ export async function clientsHandler(req, reply) {
     SELECT c.id, c.code, c.name, c.category, c.aum_paise,
            ROUND(c.aum_paise / 1e9::numeric, 2) AS aum_cr,
            ROUND(c.aum_paise * 100.0 / NULLIF((SELECT SUM(aum_paise) FROM clients WHERE is_active), 0), 1) AS aum_pct,
-           c.brokerage_pct, c.tax_pct
+           c.brokerage_pct, c.tax_pct, c.exec_type
     FROM clients c
     WHERE c.is_active = TRUE
     ORDER BY c.aum_paise DESC
@@ -40,7 +40,9 @@ export async function clientsHandler(req, reply) {
              cs.joined_at::text,
              ROUND(cs.allocation_paise / 1e9::numeric, 2) AS allocation_cr,
              ROUND(COALESCE(NULLIF(cs.exposure_paise, 0), cs.allocation_paise) / 1e9::numeric, 2) AS exposure_cr,
-             COALESCE(cs.leverage, 1)::float AS leverage
+             COALESCE(cs.leverage, 1)::float AS leverage,
+             ROUND(COALESCE(NULLIF(cs.cash_paise, 0), cs.allocation_paise) / 1e9::numeric, 2) AS cash_cr,
+             ROUND(cs.pledge_paise / 1e9::numeric, 2) AS pledge_cr
       FROM client_strategies cs
       JOIN strategies s ON s.id = cs.strategy_id
       WHERE cs.client_id = $1 AND cs.is_active = TRUE
@@ -233,6 +235,7 @@ export async function clientsHandler(req, reply) {
       aum_pct:       +cl.aum_pct,
       brokerage_pct: +cl.brokerage_pct,
       tax_pct:       +cl.tax_pct,
+      exec_type:     cl.exec_type || 'F2F',
       joined_at: primaryStrategy?.joined_at || null,
       strategies: strategies.map(s => ({
         code: s.code,
@@ -241,6 +244,8 @@ export async function clientsHandler(req, reply) {
         allocation_cr: +s.allocation_cr,
         exposure_cr: +s.exposure_cr,
         leverage: +s.leverage,
+        cash_cr: +s.cash_cr,
+        pledge_cr: +s.pledge_cr,
       })),
       stats: {
         net_inr:         Math.round(totalNet),

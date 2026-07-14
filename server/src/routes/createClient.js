@@ -44,6 +44,14 @@ export async function createClientHandler(req, reply) {
   if (!Number.isFinite(brokeragePct) || brokeragePct < 0 || brokeragePct > 100) return reply.code(400).send({ error: 'brokerage_pct must be between 0 and 100.' })
   if (!Number.isFinite(taxPct) || taxPct < 0 || taxPct > 100) return reply.code(400).send({ error: 'tax_pct must be between 0 and 100.' })
 
+  // Execution type + pledge/cash split of the allocation (cash is the base for Return-on-Cash).
+  const execType = ['F2F', 'F2O'].includes(String(b.exec_type || '').toUpperCase()) ? String(b.exec_type).toUpperCase() : 'F2F'
+  const cashCr = b.cash_cr != null ? Number(b.cash_cr) : allocationCr           // default: all cash
+  const pledgeCr = b.pledge_cr != null ? Number(b.pledge_cr) : Math.max(0, allocationCr - cashCr)
+  if (!Number.isFinite(cashCr) || cashCr < 0) return reply.code(400).send({ error: 'cash_cr must be >= 0.' })
+  if (!Number.isFinite(pledgeCr) || pledgeCr < 0) return reply.code(400).send({ error: 'pledge_cr must be >= 0.' })
+  if (Math.abs((cashCr + pledgeCr) - allocationCr) > 0.011) return reply.code(400).send({ error: 'Stock pledge + cash must equal the strategy allocation.' })
+
   // ── Persist ───────────────────────────────────────────────────────────────
   const client = await pool.connect()
   try {
@@ -58,10 +66,10 @@ export async function createClientHandler(req, reply) {
 
     // Insert client (clients table has no joined_at — that lives on client_strategies)
     const { rows: [cl] } = await client.query(`
-      INSERT INTO clients (code, name, category, aum_paise, brokerage_pct, tax_pct, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-      RETURNING id, code, name, category, aum_paise, brokerage_pct, tax_pct
-    `, [code, name, category, toPaise(aumCr), brokeragePct, taxPct])
+      INSERT INTO clients (code, name, category, aum_paise, brokerage_pct, tax_pct, exec_type, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+      RETURNING id, code, name, category, aum_paise, brokerage_pct, tax_pct, exec_type
+    `, [code, name, category, toPaise(aumCr), brokeragePct, taxPct, execType])
 
     // Look up strategy
     const { rows: strategies } = await client.query(
@@ -75,9 +83,9 @@ export async function createClientHandler(req, reply) {
 
     // Insert client_strategies
     await client.query(`
-      INSERT INTO client_strategies (client_id, strategy_id, allocation_paise, exposure_paise, leverage, joined_at, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-    `, [cl.id, strategyId, toPaise(allocationCr), toPaise(exposureCr), leverage, joinedAt])
+      INSERT INTO client_strategies (client_id, strategy_id, allocation_paise, exposure_paise, leverage, cash_paise, pledge_paise, joined_at, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+    `, [cl.id, strategyId, toPaise(allocationCr), toPaise(exposureCr), leverage, toPaise(cashCr), toPaise(pledgeCr), joinedAt])
 
     await client.query('COMMIT')
 

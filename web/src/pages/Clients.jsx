@@ -354,12 +354,12 @@ function ClientRow({ c, active, onClick }) {
   const net = c.stats.net_inr
   const curValCr = capCr + net / 1e7                 // current valuation = capital + P&L
   const nc = net >= 0 ? 'u' : 'd'
-  const instr = 'F2F'                                 // futures pair (F2O = fut × option variant)
+  const instr = c.exec_type || 'F2F'                  // F2F = fut × fut pair · F2O = fut × option pair
   return (
     <tr className={'clist-row' + (active ? ' active' : '')} onClick={onClick}>
       <td className="m">{fDate(c.joined_at)}</td>
       <td><div className="clr-name"><b>{c.name}</b><span className={'chiplbl sm ' + CAT_CLS[c.category]}>{CAT_LBL[c.category]}</span></div></td>
-      <td><span className="instr-chip" title="Futures pair (Midcap fut × Nifty fut)">{instr}</span></td>
+      <td><span className="instr-chip" title={instr === 'F2O' ? 'Fut × Option pair (Midcap fut × Nifty option)' : 'Fut × Fut pair (Midcap fut × Nifty fut)'}>{instr}</span></td>
       <td className="num m">{fCr(capCr)}</td>
       <td className={'num m ' + nc}>{fL(net)}</td>
       <td className="num m"><b>{fCr(curValCr)}</b></td>
@@ -374,13 +374,20 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
   const [rangeKey, setRangeKey] = useState('all')
   const [dInstr, setDInstr] = useState('fut')    // fut | opt
   const [dIdx, setDIdx] = useState('combined')   // combined | banknifty
+  const [returnBase, setReturnBase] = useState('capital')  // capital | cash (Return-on-Cash toggle)
   const catCls = CAT_CLS[cl.category] || 'retail'
   const catLbl = CAT_LBL[cl.category] || cl.category.toUpperCase()
   const strategy = primaryStrategy(cl)
   const allocationCr = strategy?.allocation_cr ?? cl.aum_cr
   const exposureCr = strategy?.exposure_cr ?? allocationCr
   const leverage = strategy?.leverage ?? (allocationCr > 0 ? exposureCr / allocationCr : 0)
-  const aumInr = allocationCr * 1e7          // capital — the base for RETURN %
+  const cashCr = strategy?.cash_cr ?? allocationCr                            // cash share of allocation
+  const pledgeCr = strategy?.pledge_cr ?? Math.max(0, allocationCr - cashCr)  // stock-pledge share
+  // Return-on-Cash toggle: re-base every % stat (return, MoM, best month, Max DD) onto the CASH
+  // portion instead of full capital. ₹ amounts, Sharpe and win-rate are base-invariant.
+  const onCash = returnBase === 'cash'
+  const baseCr = onCash ? (cashCr || allocationCr) : allocationCr
+  const aumInr = baseCr * 1e7                // RETURN % base — capital or cash per the toggle
   const deployedInr = exposureCr * 1e7       // deployed (capital × leverage) — the base P&L runs on
   // Variant toggle: Options / BankNifty take the 30 Cr backtest and scale ₹ to THIS client's
   // DEPLOYED capital (exposure = allocation × leverage); return %/Sharpe/DD are the strategy's own.
@@ -391,9 +398,13 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
     : cl.monthly
   const filtered = filterMonthly(srcMonthly, rangeKey)
   const stats = computeStats(filtered, aumInr)
-  const bestMoPct = filtered.length ? Math.max(...filtered.map(m => m.pct)) : 0   // best single-month return %
-  const pairMaxDd = vActive ? Number(vActive.summary.pair_max_dd_pct)
-    : Number(cl.stats?.pair_max_dd_pct ?? cl.stats?.max_dd_pct ?? stats.max_dd_pct)
+  // Re-base each month's % to the chosen base so the heatmap + best-month track the toggle.
+  const filteredBased = filtered.map(m => ({ ...m, pct: aumInr > 0 ? m.net_inr / aumInr * 100 : 0 }))
+  const bestMoPct = filteredBased.length ? Math.max(...filteredBased.map(m => m.pct)) : 0
+  // Drawdown ratio scales inversely with the base: DD_cash = DD_capital × (capital / cash).
+  const ddFactor = onCash && cashCr > 0 ? allocationCr / cashCr : 1
+  const pairMaxDd = (vActive ? Number(vActive.summary.pair_max_dd_pct)
+    : Number(cl.stats?.pair_max_dd_pct ?? cl.stats?.max_dd_pct ?? stats.max_dd_pct)) * ddFactor
   const trades = vActive ? [] : filterTrades(cl.recent_trades, filtered)
   const ch = cl.charges, chT = ch.total_inr || 1
   const nc = stats.net_inr >= 0 ? 'u' : 'd', rc = stats.return_pct >= 0 ? 'u' : 'd'
@@ -452,9 +463,18 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           </div>
         )}
 
+        <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '8px 18px 2px' }}>
+          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Return basis</span>
+          <button className={'chip' + (!onCash ? ' on' : '')} onClick={() => setReturnBase('capital')}>On Capital</button>
+          <button className={'chip' + (onCash ? ' on' : '')} onClick={() => setReturnBase('cash')}>On Cash</button>
+          <span style={{ fontSize: 10.5, color: 'var(--muted)', marginLeft: 4 }}>
+            cash {fCr(cashCr)} · pledge {fCr(pledgeCr)} of {fCr(allocationCr)} capital
+          </span>
+        </div>
+
         <div className="d-hero">
           <Hk l="Net PnL" cls={nc} v={fL(stats.net_inr)} />
-          <Hk l="Net Return" cls={rc} v={pctStr(stats.return_pct)} />
+          <Hk l={onCash ? 'Return on Cash' : 'Net Return'} cls={rc} v={pctStr(stats.return_pct)} />
           <Hk l="Sharpe" v={stats.sharpe} />
           <Hk l="Win rate" cls="u" v={stats.win_rate + '%'} />
           <Hk l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
@@ -465,8 +485,8 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
         <EquityCurve monthly={filtered} allocationCr={allocationCr} deployedCr={exposureCr} backtest={vActive ? null : backtest} backtestBaseAum={backtestBaseAum} />
 
         <div className="d-sec">
-          <div className="d-sec-l">Month-on-Month Net Returns · % of strategy allocation</div>
-          <Heatmap monthly={filtered} />
+          <div className="d-sec-l">Month-on-Month Net Returns · % of {onCash ? 'cash deployed' : 'strategy allocation'}</div>
+          <Heatmap monthly={filteredBased} />
           <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
         </div>
 
@@ -480,6 +500,8 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
             <Sc l="Total Charges" v={fL(stats.charges_inr)} />
             <Sc l="Client capital" v={fCr(cl.aum_cr)} />
             <Sc l="Strategy allocation" v={fCr(allocationCr)} />
+            <Sc l="Cash" cls={onCash ? 'u' : ''} v={fCr(cashCr)} />
+            <Sc l="Stock pledge" v={fCr(pledgeCr)} />
             <Sc l="Strategy exposure" v={fCr(exposureCr)} />
             <Sc l="Leverage" v={fmtLev(leverage)} />
             <Sc l="Win months" v={stats.wins + ' / ' + stats.total_months} />

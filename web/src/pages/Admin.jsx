@@ -48,6 +48,8 @@ function AddClientModal({ onClose, onSaved }) {
   const [leverage, setLeverage] = useState('1')
   const [brokeragePct, setBrokeragePct] = useState('0')
   const [taxPct, setTaxPct] = useState('0')
+  const [execType, setExecType] = useState('F2F')     // F2F (fut×fut) | F2O (fut×option)
+  const [cashInr, setCashInr] = useState('')          // cash share of allocation (rest = stock pledge)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -98,7 +100,10 @@ function AddClientModal({ onClose, onSaved }) {
     const lev = leverage !== '' ? Number(leverage) : 1
     const brok = Number(brokeragePct) || 0
     const tax  = Number(taxPct) || 0
+    const cashRaw = cashInr !== '' ? fieldNum(parseInr(cashInr)) : allocRaw   // default: all cash
+    const pledgeRaw = Math.max(0, allocRaw - cashRaw)
     if (allocRaw < 0 || allocRaw > aumRaw) { setErr('Allocation must be between 0 and total capital.'); return }
+    if (cashRaw < 0 || cashRaw > allocRaw) { setErr('Cash must be between 0 and the strategy allocation.'); return }
     if (expoRaw < 0) { setErr('Exposure must be >= 0.'); return }
     if (lev < 0 || lev > 10) { setErr('Leverage must be between 0× and 10×.'); return }
     if (brok < 0 || brok > 100) { setErr('Brokerage % must be between 0 and 100.'); return }
@@ -115,6 +120,9 @@ function AddClientModal({ onClose, onSaved }) {
         strategy_code: 'MIDCAP_NIFTY_PAIR',
         brokerage_pct: brok,
         tax_pct: tax,
+        exec_type: execType,
+        cash_cr: inrToCr(cashRaw),
+        pledge_cr: inrToCr(pledgeRaw),
       })
       onSaved()
     } catch (e) {
@@ -127,6 +135,8 @@ function AddClientModal({ onClose, onSaved }) {
   const allocNum = fieldNum(parseInr(allocInr || aumInr))
   const expoNum  = fieldNum(parseInr(expoInr || allocInr || aumInr))
   const levVal   = allocNum > 0 ? expoNum / allocNum : 0
+  const cashNum  = cashInr !== '' ? fieldNum(parseInr(cashInr)) : allocNum
+  const pledgeNum = Math.max(0, allocNum - cashNum)
 
   return (
     <div className="overlay" onClick={e => { if (e.target.classList.contains('overlay')) onClose() }}>
@@ -146,6 +156,11 @@ function AddClientModal({ onClose, onSaved }) {
                 <option>Retail</option><option>HNI</option><option>Institution</option>
               </select>
             </div>
+            <div className="field" style={{ flex: 1 }}><label>Type</label>
+              <select value={execType} onChange={e => setExecType(e.target.value)}>
+                <option value="F2F">F2F · fut×fut</option><option value="F2O">F2O · fut×option</option>
+              </select>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 14 }}>
             <div className="field" style={{ flex: 1 }}><label>Total capital (₹)</label>
@@ -159,6 +174,10 @@ function AddClientModal({ onClose, onSaved }) {
           <div className="field"><label>Strategy allocation (₹)</label>
             <input placeholder={aumInr || 'e.g. 5,00,000'} value={allocInr} onChange={e => syncAlloc(e.target.value)} />
             {allocInr && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{(fieldNum(parseInr(allocInr)) / INR_TO_CR).toFixed(4)} Cr</div>}
+          </div>
+          <div className="field"><label>Cash (₹) <span style={{ fontWeight: 400, fontSize: 10.5, color: 'var(--muted)' }}>· remainder of allocation is stock pledge · base for Return-on-Cash</span></label>
+            <input placeholder={allocInr || aumInr || 'e.g. 4,00,000'} value={cashInr} onChange={e => handleInrInput(e.target.value, setCashInr)} />
+            <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>Cash {(cashNum / INR_TO_CR).toFixed(2)} Cr · Stock pledge {(pledgeNum / INR_TO_CR).toFixed(2)} Cr</div>
           </div>
           <div style={{ display: 'flex', gap: 14 }}>
             <div className="field" style={{ flex: 1 }}><label>Strategy exposure (₹)</label>

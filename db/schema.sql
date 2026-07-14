@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS clients (
   aum_paise     BIGINT NOT NULL DEFAULT 0,      -- money in paise (1 INR = 100 paise)
   brokerage_pct NUMERIC(8,4) NOT NULL DEFAULT 0, -- per-client brokerage rate (%)
   tax_pct       NUMERIC(8,4) NOT NULL DEFAULT 0, -- per-client tax rate (%)
+  exec_type     TEXT NOT NULL DEFAULT 'F2F',     -- F2F (fut×fut pair) | F2O (fut×option pair)
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -33,6 +34,8 @@ CREATE TABLE IF NOT EXISTS client_strategies (
   allocation_paise BIGINT NOT NULL DEFAULT 0,   -- capital allocated to this strategy
   exposure_paise  BIGINT NOT NULL DEFAULT 0,    -- exposure assigned to this strategy
   leverage        NUMERIC(10,4) NOT NULL DEFAULT 1,
+  cash_paise      BIGINT NOT NULL DEFAULT 0,    -- cash share of allocation (base for Return-on-Cash)
+  pledge_paise    BIGINT NOT NULL DEFAULT 0,    -- stock-pledge share of allocation (cash + pledge = allocation)
   is_active       BOOLEAN NOT NULL DEFAULT TRUE,
   joined_at       DATE NOT NULL,
   UNIQUE (client_id, strategy_id)
