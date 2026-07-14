@@ -260,10 +260,9 @@ export default function Dashboard() {
 
       <div className="shell">
         <div className="title">{vActive ? `${vActive.summary.name} (spot-backtested)` : legFilter ? `Pair Trading — ${legLabel} leg (indicative)` : 'Pair Trading — Live Book'}</div>
-        <div className="crumb">Midcap × Nifty · {isSynthetic ? '' : `latest trading day ${fmtDate(d.latest_date)} · `}showcasing {showcaseFrom} – {showcaseTo}{vActive ? ' · spot-backtested' : legFilter ? ' · indicative' : ''}</div>
 
         {/* Index / Instrument variant toggle */}
-        <div className="fu" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '10px 0 4px' }}>
+        <div className="fu" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '4px 0 14px' }}>
           <div className="chips" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 2 }}>Index</span>
             {[['combined', 'Combined'], ['nifty', 'NIFTY 50'], ['midcap', 'NIFTY MID SELECT'], ['banknifty', 'BANK NIFTY']].map(([k, label]) => (
