@@ -25,7 +25,7 @@ import {
 import { capitalMaxDrawdownPct, yearlyReturns } from '../lib/riskAnalytics'
 import { VARIANTS } from '../lib/variantData'
 
-const CATCOLOR = { Institution: '#0EA5E9', HNI: '#38BDF8', Retail: '#F97316' }
+const CATCOLOR = { Institution: '#0369A1', HNI: '#38BDF8', Retail: '#F97316' }
 const CATCLS = { Institution: 'inst', HNI: 'hni', Retail: 'retail' }
 const IDX = ['All Indices', 'NIFTY 50', 'NIFTY MIDCAP SELECT', 'Combined (pair)']
 const EQ_W = 700
@@ -36,6 +36,8 @@ export default function Dashboard() {
   const { data: d, isError, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => apiGet('/api/dashboard'),
+    refetchInterval: 60000,        // live: re-mark open pair + Today to the current price every minute
+    refetchOnWindowFocus: true,
   })
 
   const [mode, setMode] = useState('overall')   // overall | today
@@ -129,11 +131,14 @@ export default function Dashboard() {
   const rPct = +(mix.Retail / tot * 100).toFixed(1)
   const hPct = +(mix.HNI / tot * 100).toFixed(1)
   const iPct = +(mix.Institution / tot * 100).toFixed(1)
-  const pieBg = `conic-gradient(#F97316 0 ${rPct}%,#38BDF8 ${rPct}% ${rPct + hPct}%,#0EA5E9 ${rPct + hPct}% 100%)`
+  const pieBg = `conic-gradient(#F97316 0 ${rPct}%,#38BDF8 ${rPct}% ${rPct + hPct}%,#0369A1 ${rPct + hPct}% 100%)`
 
-  // margin (approx 25% of AUM = SPAN initial)
-  const marginCr = book.aum_cr * 0.25
-  const freeCr = book.aum_cr - marginCr
+  // Margin blocked at TODAY's live rate = open-pair notional × ~12% SPAN+exposure (from the API,
+  // computed on live prices), scaled to the displayed AUM. Falls back to 25%-of-AUM if no live data.
+  const marginCr = d.margin?.used_inr ? scaleInr(d.margin.used_inr) / 1e7 : dispAumCr * 0.25
+  const freeCr = Math.max(0, dispAumCr - marginCr)
+  const marginPct = dispAumCr > 0 ? Math.round(marginCr / dispAumCr * 100) : 0
+  const marginLive = !!d.margin?.live
   const half = book.exposure_cr / 2
 
   // gauge arc
@@ -196,11 +201,14 @@ export default function Dashboard() {
   const isSynthetic = !!(vActive || legFilter)
   const effMode = (vActive || legFilter) ? 'overall' : mode
   const heroReal = scaleInr(effMode === 'overall' ? rangeStats.realised_inr : d.hero.today.realised_inr)  // realised, scaled to AUM
-  const heroUnreal = isSynthetic ? 0 : totalUnreal          // open-position mark-to-market (already scaled)
+  // Overall: open-pair MTM since entry. Today: the live intraday day-move (matches the Today tile).
+  const heroUnreal = isSynthetic ? 0
+    : effMode === 'overall' ? totalUnreal
+    : scaleInr(d.hero.today.unrealised_inr ?? d.hero.today.net_inr)
   const heroAmt = heroReal + heroUnreal                     // Net PnL = realised + unrealised
   const heroSince = effMode === 'overall'
     ? `${rangeStats.return_pct >= 0 ? '+' : ''}${rangeStats.return_pct}% · ${vActive ? vActive.summary.subtitle : legFilter ? legLabel + ' only' : activeRangeLabel}`
-    : `last trading day · ${fmtDate(d.hero.today.date)}`
+    : `${d.hero.today.live ? 'live · ' : 'last trading day · '}${fmtDate(d.hero.today.date)}`
 
   // Open positions — the live futures pair, sized & marked to the real AUM.
   const shownPos = pos
@@ -320,7 +328,7 @@ export default function Dashboard() {
               <div className="plg">
                 <div><i style={{ background: '#F97316' }}></i>Retail <small>&lt;₹5Cr</small><b>{rPct}%</b></div>
                 <div><i style={{ background: '#38BDF8' }}></i>HNI <small>5–100Cr</small><b>{hPct}%</b></div>
-                <div><i style={{ background: '#0EA5E9' }}></i>Institution <small>&gt;100Cr</small><b>{iPct}%</b></div>
+                <div><i style={{ background: '#0369A1' }}></i>Institution <small>&gt;100Cr</small><b>{iPct}%</b></div>
               </div>
             </div>
           </div>
@@ -331,9 +339,9 @@ export default function Dashboard() {
           <div className="t c4 r2 flexcol fu" style={{ animationDelay: '.05s' }}>
             <div className="l">Margin</div>
             <div className="v" style={{ fontSize: 18 }}>{fmtCr(marginCr)}</div>
-            <div className="meter"><i className="used" style={{ width: '25%' }}></i><i className="free" style={{ width: '75%' }}></i></div>
+            <div className="meter"><i className="used" style={{ width: `${marginPct}%` }}></i><i className="free" style={{ width: `${100 - marginPct}%` }}></i></div>
             <div className="mleg"><span>Used <b>{fmtCr(marginCr)}</b></span><span>Free <b>{fmtCr(freeCr)}</b></span></div>
-            <div className="s" style={{ marginTop: 'auto' }}>25% utilised · EOD</div>
+            <div className="s" style={{ marginTop: 'auto' }}>{marginPct}% utilised · SPAN+exp @ 12% · {marginLive ? 'live' : 'EOD'}</div>
           </div>
 
           {/* Return on AUM / Avg AUM */}
@@ -455,12 +463,14 @@ export default function Dashboard() {
           <div className="t c12 todaytile fu">
             <div className="hd"><b><span className="dot"></span>Today</b><span>{fmtDate(d.hero.today.date)}</span></div>
             <div className="cells">
-              <Cell l="Net PnL" v={fmtInr(scaleInr(d.hero.today.net_inr) + totalUnreal)} />
+              {/* Live day-move of the open pair (Angel One day-change × qty). Net = Realised + Unrealised;
+                  nothing closed today so Realised is 0 and the whole move is unrealised MTM. */}
+              <Cell l="Net PnL" v={fmtInr(scaleInr(d.hero.today.net_inr))} />
               <Cell l="Realised" v={fmtInr(scaleInr(d.hero.today.realised_inr))} />
-              <Cell l="Unrealised" v={fmtInr(totalUnreal)} />
+              <Cell l="Unrealised" v={fmtInr(scaleInr(d.hero.today.unrealised_inr ?? d.hero.today.net_inr))} />
               <Cell l="Trades" v={d.hero.today.trades ?? pos.length} />
               <Cell l="Exposure" v={fmtCr(dispAumCr)} />
-              <Cell l="Margin" v={fmtCr(dispAumCr * 0.25)} />
+              <Cell l="Margin" v={fmtCr(marginCr)} />
             </div>
           </div>
 

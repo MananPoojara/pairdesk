@@ -6,8 +6,11 @@
 // buildBacktestRows() rescales by (aumCr / 30) and cumulates per selected window.
 export const SPOT_BACKTEST_BASE_AUM_CR = 30
 
-// max_dd_pct kept as the reference pair combined drawdown used across the app.
-export const pairReferenceStats = { max_dd_pct: 2.57 }
+// Pair combined Max Drawdown — the deepest peak-to-trough dip of the CUMULATIVE month-on-month
+// net P&L curve, expressed as % of the ₹30 Cr base. Episode: Nov-2025 peak (₹12.29 Cr) → Jan-2026
+// trough (₹11.35 Cr) = ₹0.94 Cr dip = 3.14% of 30 Cr. (Robust to entry-vs-expiry month grouping.)
+// This replaces the old per-leg drawdown method; it's the reference DD used across the whole app.
+export const pairReferenceStats = { max_dd_pct: 3.14 }
 
 export const spotBacktest = [
   { date: '2024-09-01', net_inr: -563815, midcap_net_inr: -23485795, nifty_net_inr: 22921980 },

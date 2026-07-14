@@ -4,13 +4,11 @@ import { dirname, join } from 'path'
 import { query } from '../db/pg.js'
 import { duckQuery, PARQUET } from '../db/duck.js'
 import { pairReferenceStats, spotBacktest, SPOT_BACKTEST_BASE_AUM_CR } from '../data/spotBacktest.js'
+import { getLiveMarket, readSnapshot } from '../data/liveMarket.js'
 
-// Live index tickers (NIFTY 50 / MIDCAP SELECT / NIFTY BANK) from Angel One EOD, refreshed by
-// `python3 Data/fetch_tickers.py`. Read per-request so a re-run updates without a server restart.
-const TICKERS_PATH = join(dirname(fileURLToPath(import.meta.url)), '../data/tickers.json')
-export function readTickers() {
-  try { return JSON.parse(readFileSync(TICKERS_PATH, 'utf8')) } catch { return null }
-}
+// Live index quotes (NIFTY 50 / MIDCAP SELECT / NIFTY BANK) come from data/liveMarket.js — the
+// backend fetches Angel One in-process (60s cache, disk-backed fallback) and marks the open pair
+// to the current price on every request. readSnapshot() is the sync last-known fallback.
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmtCr  = n => Math.round(n * 100) / 100   // 2dp Cr
@@ -47,6 +45,12 @@ export async function dashboardHandler(req, reply) {
   const AUM_PAISE = aumRow[0].total_paise
   const AUM_INR   = AUM_PAISE / 100          // rupees  (total platform AUM — for book display only)
   const AUM_CR    = AUM_PAISE / 1e9          // crores  (total platform AUM — for book display only)
+
+  // Live index quotes (Angel One, 60s cache). Used to mark the open pair + "Today" to the current
+  // price. Null-safe: if the fetch fails we fall back to parquet LTP / last trade day below.
+  const live = await getLiveMarket().catch(() => null)
+  const liveLtp = { NIFTY: live?.nifty?.ltp, MIDCPNIFTY: live?.midcap?.ltp }
+  const liveChg = { NIFTY: live?.nifty?.change, MIDCPNIFTY: live?.midcap?.change }
   // Trades are calibrated to 30 Cr deployment — use this for all % calculations (pct, sharpe, return_pct)
   const BASE_CR   = 30
   const BASE_INR  = BASE_CR * 1e7
@@ -175,9 +179,10 @@ export async function dashboardHandler(req, reply) {
     })
   }
 
-  // Enrich positions with live LTP-based unrealised
+  // Enrich positions with live LTP-based unrealised.
+  // Price priority: live Angel One index quote → parquet continuous close → trade exit price.
   const enrichedPos = positions.map(p => {
-    const ltp     = ltpByUnderlying[p.underlying] ?? +p.exit_price
+    const ltp     = liveLtp[p.underlying] ?? ltpByUnderlying[p.underlying] ?? +p.exit_price
     const qty     = p.lots * p.lot_size
     const points  = p.direction === 'LONG' ? ltp - +p.entry_price : +p.entry_price - ltp
     const unreal  = points * qty
@@ -197,6 +202,13 @@ export async function dashboardHandler(req, reply) {
     }
   })
 
+  // Margin blocked = open-pair notional at the LIVE price × SPAN+exposure rate (~12% for index
+  // futures; MIDCPNIFTY and NIFTY are different underlyings → margined separately, no hedge benefit).
+  // Moves with today's live rate. Computed at 30 Cr base; the client scales it to displayed AUM.
+  const MARGIN_RATE = 0.12
+  const grossNotionalInr = enrichedPos.reduce((s, p) => s + p.ltp * p.lots * p.lot_size, 0)
+  const marginUsedInr = grossNotionalInr * MARGIN_RATE
+
   // 7. Rollover tile — next expiry after max
   const { rows: nextExp } = await query(`
     SELECT DISTINCT expiry::text
@@ -215,25 +227,40 @@ export async function dashboardHandler(req, reply) {
   // latest_date = last date we have prices (fut_continuous → 2026-06-18), used for LTP/ticker.
   const todayStr = latestPriceDate ?? maxExpiry   // e.g. "2026-06-18"
 
-  // "Today" PnL = the last actual TRADE day in the DB (monthly rollover → e.g. 2026-05-26).
-  // We show historical results "as if live", so Today reflects the most recent day we have data for.
-  const { rows: lastDayRows } = await query(`
-    SELECT t.trade_date::text AS d,
-           (SUM(CASE WHEN t.direction='LONG'
-                     THEN (t.exit_price-t.entry_price)*t.lots*t.lot_size
-                     ELSE (t.entry_price-t.exit_price)*t.lots*t.lot_size END)
-            - COALESCE(SUM(tc.total_paise),0)/100.0)::float AS net,
-           COUNT(*)::int AS trades
-    FROM trades t
-    JOIN trade_charges tc ON tc.trade_id = t.id
-    GROUP BY t.trade_date
-    ORDER BY t.trade_date DESC
-    LIMIT 1
-  `)
-  const lastDay      = lastDayRows[0] || null
-  const todayDayStr  = lastDay ? lastDay.d : todayStr
-  const todayNetInr  = lastDay ? +lastDay.net : 0
-  const todayTrades  = lastDay ? +lastDay.trades : 0
+  // "Today" = the open pair marked to today's LIVE intraday move (Angel One day-change × qty, signed
+  // by leg direction). Real calendar date, updates every minute with the price. Falls back to the
+  // last actual trade day in the DB only when no live quote is available.
+  const istToday    = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)  // IST date
+  const haveLiveChg = positions.some(p => liveChg[p.underlying] != null)
+  let todayDayStr, todayNetInr, todayTrades
+  if (haveLiveChg) {
+    todayNetInr = positions.reduce((s, p) => {
+      const chg = liveChg[p.underlying]
+      if (chg == null) return s
+      const qty = p.lots * p.lot_size
+      return s + (p.direction === 'LONG' ? chg : -chg) * qty
+    }, 0)
+    todayDayStr = (live?.updated || istToday).slice(0, 10)
+    todayTrades = positions.length
+  } else {
+    const { rows: lastDayRows } = await query(`
+      SELECT t.trade_date::text AS d,
+             (SUM(CASE WHEN t.direction='LONG'
+                       THEN (t.exit_price-t.entry_price)*t.lots*t.lot_size
+                       ELSE (t.entry_price-t.exit_price)*t.lots*t.lot_size END)
+              - COALESCE(SUM(tc.total_paise),0)/100.0)::float AS net,
+             COUNT(*)::int AS trades
+      FROM trades t
+      JOIN trade_charges tc ON tc.trade_id = t.id
+      GROUP BY t.trade_date
+      ORDER BY t.trade_date DESC
+      LIMIT 1
+    `)
+    const lastDay = lastDayRows[0] || null
+    todayDayStr   = lastDay ? lastDay.d : istToday
+    todayNetInr   = lastDay ? +lastDay.net : 0
+    todayTrades   = lastDay ? +lastDay.trades : 0
+  }
 
   // Charge pie splits (pct of total)
   const chTotal = +ch.total || 1
@@ -254,11 +281,12 @@ export async function dashboardHandler(req, reply) {
         since:        '26 Sep 2024',
       },
       today: {
-        net_inr:      Math.round(todayNetInr),
-        realised_inr: Math.round(todayNetInr),
-        unrealised_inr: 0,
-        date:         todayDayStr,
-        trades:       todayTrades,
+        net_inr:        Math.round(todayNetInr),
+        realised_inr:   haveLiveChg ? 0 : Math.round(todayNetInr),
+        unrealised_inr: haveLiveChg ? Math.round(todayNetInr) : 0,
+        date:           todayDayStr,
+        trades:         todayTrades,
+        live:           haveLiveChg,
       }
     },
     book: {
@@ -268,6 +296,12 @@ export async function dashboardHandler(req, reply) {
       leverage:    1.00,
       clients:     clients.length,
       strategies:  1,
+    },
+    margin: {
+      notional_inr: Math.round(grossNotionalInr),   // open-pair gross notional at live price (30 Cr base)
+      rate:         MARGIN_RATE,
+      used_inr:     Math.round(marginUsedInr),       // margin blocked at today's rate (30 Cr base)
+      live:         Object.values(liveLtp).some(v => v != null),
     },
     stats: {
       sharpe:          sr,
@@ -324,7 +358,8 @@ export async function dashboardHandler(req, reply) {
       expiry:  rolloverExpiry,
       label:   new Date(rolloverExpiry).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(/ /g,' '),
     },
-    latest_date: todayDayStr,   // last actual TRADE day (e.g. 2026-06-30), for the subtitle + chart end
-    tickers: readTickers(),     // live NIFTY 50 / MIDCAP SELECT / NIFTY BANK EOD (Angel One)
+    latest_date: maxExpiry,     // last realised cycle (data end) — drives the showcase range + chart end.
+                                // The real calendar date lives on hero.today.date (live).
+    tickers: live || readSnapshot(),  // live NIFTY 50 / MIDCAP SELECT / NIFTY BANK (Angel One)
   }
 }
