@@ -321,7 +321,7 @@ export default function Dashboard() {
           </div>
 
           <div className="hcard hclient" onClick={() => setBreakdown(true)} style={{ cursor: 'pointer' }}>
-            <div className="l2">Client Mix <span className="e">{d.clients.length} · by capital ↗</span></div>
+            <div className="l2">Client Mix</div>
             <div className="pcont" style={{ marginTop: 12 }}>
               <div className="pie" style={{ background: pieBg }}><div className="c"><b>{d.clients.length}</b><small>clients</small></div></div>
               <div className="plg">
@@ -340,7 +340,7 @@ export default function Dashboard() {
             <div className="v" style={{ fontSize: 18 }}>{fmtCr(marginCr)}</div>
             <div className="meter"><i className="used" style={{ width: `${marginPct}%` }}></i><i className="free" style={{ width: `${100 - marginPct}%` }}></i></div>
             <div className="mleg"><span>Used <b>{fmtCr(marginCr)}</b></span><span>Free <b>{fmtCr(freeCr)}</b></span></div>
-            <div className="s" style={{ marginTop: 'auto' }}>{marginPct}% utilised · SPAN+exp @ 12% · {marginLive ? 'live' : 'EOD'}</div>
+            <div className="s" style={{ marginTop: 'auto' }}>{marginPct}% utilised</div>
           </div>
 
           {/* Return on AUM / Avg AUM */}
@@ -363,7 +363,6 @@ export default function Dashboard() {
             <div className="mleg" style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
               <span>Gross exposure <b>{fmtCr(book.exposure_cr)}</b></span>
               <span>Net (L−S) <b>{fmtCr(0)}</b></span>
-              <span>Leverage <b>{book.leverage.toFixed(2)}×</b></span>
             </div>
           </div>
 
@@ -376,7 +375,7 @@ export default function Dashboard() {
               <div className={'v ' + (rangeStats.total_net_inr >= 0 ? 'u' : 'd')} style={{ fontSize: 26 }}>{fmtInr(scaleInr(rangeStats.total_net_inr))}</div>
               <div style={{ display: 'flex', gap: 7 }}>
                 <MiniStat l="Best mo" cls="u" v={(dispBestMo >= 0 ? '+' : '') + dispBestMo.toFixed(2) + '%'} />
-                <MiniStat l="Worst" cls="d" v={(dispWorstMo >= 0 ? '+' : '') + dispWorstMo.toFixed(2) + '%'} />
+                <MiniStat l="Worst Mo" cls="d" v={(dispWorstMo >= 0 ? '+' : '') + dispWorstMo.toFixed(2) + '%'} />
                 <MiniStat l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
                 <MiniStat l="Sharpe" v={dispSharpe.toFixed(2)} />
                 <MiniStat l="Win rate" cls="u" v={dispWinRate.toFixed(0) + '%'} />

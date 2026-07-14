@@ -448,21 +448,21 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           <button className="d-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="rng-bar">
-          {RANGES.map(r => (
-            <button key={r} className={'rng-chip' + (r === rangeKey ? ' active' : '')} onClick={() => setRangeKey(r)}>{RLBL[r]}</button>
-          ))}
-        </div>
-
-        <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '2px 18px 0' }}>
+        <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '13px 18px', background: '#fff', borderBottom: '1px solid var(--line)' }}>
           <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Index</span>
           {[['combined', 'Combined'], ['banknifty', 'BankNifty']].map(([k, label]) => (
             <button key={k} disabled={dInstr === 'opt'} className={'chip' + (dIdx === k ? ' on' : '')}
               onClick={() => dInstr !== 'opt' && setDIdx(k)}>{label}</button>
           ))}
-          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 8 }}>Instrument</span>
+          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 10 }}>Instrument</span>
           <button className={'chip' + (dInstr === 'fut' ? ' on' : '')} onClick={() => setDInstr('fut')}>Fut</button>
           <button className={'chip' + (dInstr === 'opt' ? ' on' : '')} onClick={() => setDInstr('opt')}>Options</button>
+          {/* time-range chips pushed to the right */}
+          <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
+            {RANGES.map(r => (
+              <button key={r} className={'rng-chip' + (r === rangeKey ? ' active' : '')} onClick={() => setRangeKey(r)}>{RLBL[r]}</button>
+            ))}
+          </div>
         </div>
         {vActive && (
           <div style={{ margin: '8px 18px 0', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -471,7 +471,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           </div>
         )}
 
-        <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '8px 18px 2px' }}>
+        <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '12px 18px' }}>
           <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Return basis</span>
           <button className={'chip' + (!onCash ? ' on' : '')} onClick={() => setReturnBase('capital')}>On Capital</button>
           <button className={'chip' + (onCash ? ' on' : '')} onClick={() => setReturnBase('cash')}>On Cash</button>
@@ -499,7 +499,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
         </div>
 
         <div className="d-sec">
-          <div className="d-sec-l">Strategy Stats · {RFULL[rangeKey] || 'All time'}</div>
+          <div className="d-sec-l">Strategy Stats</div>
           <div className="stat-grid">
             <Sc l="Best month" cls="u" v={fL(stats.best_month_inr)} />
             <Sc l="Worst month" cls="d" v={fL(stats.worst_month_inr)} />
@@ -564,12 +564,12 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
             </div>
 
             <div className="d-charges">
-              <Ci l="STT" v={`₹${(ch.stt_inr / 1e5).toFixed(1)} L (${(ch.stt_inr / chT * 100) | 0}%)`} />
-              <Ci l="Exchange" v={`₹${(ch.exch_inr / 1e5).toFixed(1)} L (${(ch.exch_inr / chT * 100) | 0}%)`} />
-              <Ci l="SEBI" v={`₹${(ch.sebi_inr / 1e5).toFixed(1)} L (${(ch.sebi_inr / chT * 100) | 0}%)`} />
-              <Ci l="Stamp" v={`₹${(ch.stamp_inr / 1e5).toFixed(1)} L (${(ch.stamp_inr / chT * 100) | 0}%)`} />
-              <Ci l="GST" v={`₹${(ch.gst_inr / 1e5).toFixed(1)} L (${(ch.gst_inr / chT * 100) | 0}%)`} />
-              <Ci l="Total (lifetime)" big v={fCr(ch.total_inr / 1e7)} />
+              <Ci l="STT" v={`₹${(ch.stt_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="Exchange" v={`₹${(ch.exch_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="SEBI" v={`₹${(ch.sebi_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="Stamp" v={`₹${(ch.stamp_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="GST" v={`₹${(ch.gst_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="Total" big v={fCr(ch.total_inr / 1e7)} />
             </div>
           </>
         )}
@@ -691,7 +691,7 @@ function TradesTable({ trades }) {
             <tr key={i}>
               <td className="m">{fDate(t.date)}</td>
               <td className="m">{t.contract || t.underlying}</td>
-              <td className="num m">{t.lots} lots</td>
+              <td className="num m">{fmtNum(t.lots * t.lot_size)}</td>
               <td className="num m">{fmtNum(t.entry)}</td>
               <td className="num m">{fmtNum(t.exit)}</td>
               <td className="num m" style={{ color: 'var(--muted)' }}>{(t.net_inr >= 0 ? '+' : '') + pts}</td>
