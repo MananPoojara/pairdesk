@@ -4,10 +4,11 @@ import { apiGet, apiPatch } from '../api/client'
 import MarketTickers from '../components/MarketTickers'
 import { fCr, fCr1, fL, pctStr, fDate, fMonSh } from '../lib/clientsFmt'
 import {
-  cellClr, cellTxt, cellLbl,
+  cellLbl,
   filterMonthly, filterTrades, computeStats,
   RANGES, RLBL, RFULL, CAT_ORDER, CAT_CLS, CAT_LBL, CAT_RANGE,
 } from '../lib/clientsChart'
+import { hmColor, hmText } from '../lib/curve'   // dashboard heatmap palette (colour by %, not ₹)
 import {
   buildBacktestRows,
   buildDateCurvePath,
@@ -390,6 +391,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
     : cl.monthly
   const filtered = filterMonthly(srcMonthly, rangeKey)
   const stats = computeStats(filtered, aumInr)
+  const bestMoPct = filtered.length ? Math.max(...filtered.map(m => m.pct)) : 0   // best single-month return %
   const pairMaxDd = vActive ? Number(vActive.summary.pair_max_dd_pct)
     : Number(cl.stats?.pair_max_dd_pct ?? cl.stats?.max_dd_pct ?? stats.max_dd_pct)
   const trades = vActive ? [] : filterTrades(cl.recent_trades, filtered)
@@ -456,6 +458,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           <Hk l="Sharpe" v={stats.sharpe} />
           <Hk l="Win rate" cls="u" v={stats.win_rate + '%'} />
           <Hk l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
+          <Hk l="Best Month" cls="u" v={pctStr(bestMoPct)} />
           <Hk l="Win months" v={stats.wins + ' / ' + stats.total_months} />
         </div>
 
@@ -474,7 +477,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
             <Sc l="Worst month" cls="d" v={fL(stats.worst_month_inr)} />
             <Sc l="Max drawdown" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
             <Sc l="Gross PnL" v={fL(stats.gross_inr)} />
-            <Sc l="Period charges" v={fL(stats.charges_inr)} />
+            <Sc l="Total Charges" v={fL(stats.charges_inr)} />
             <Sc l="Client capital" v={fCr(cl.aum_cr)} />
             <Sc l="Strategy allocation" v={fCr(allocationCr)} />
             <Sc l="Strategy exposure" v={fCr(exposureCr)} />
@@ -519,7 +522,7 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
           <>
             <div className="d-trades">
               <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Trades · {cl.name} · {trades.length} in range</span>
+                <span>Order Executed · {cl.name} · {trades.length} in range</span>
                 {trades.length > 0 && (
                   <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
                     onClick={() => downloadTradesCsv(trades, cl.name, cl.code)}>
@@ -695,7 +698,7 @@ function Heatmap({ monthly }) {
           const tip = cell ? `${fMonSh(y + '-' + moStr + '-01')} ${fL(net)} (${pctv >= 0 ? '+' : ''}${pctv.toFixed(2)}%)` : ''
           cells.push(
             <div key={y + '-' + i} className={'cell' + (cell ? '' : ' empty')}
-              style={{ background: cellClr(net), color: cellTxt(net) }} title={tip || undefined}>{cellLbl(pctv)}</div>
+              style={cell ? { background: hmColor(pctv), color: hmText(pctv) } : undefined} title={tip || undefined}>{cellLbl(pctv)}</div>
           )
         })
         return cells

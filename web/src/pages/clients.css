@@ -95,7 +95,7 @@
 .pg-clients /* charge footer */
 .d-charges {display:flex;gap:0;background:var(--soft);border-top:1px solid var(--line);flex-wrap:wrap}
 .pg-clients .d-charges .ci {padding:10px 16px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line)}
-.pg-clients .d-charges .ci:last-child {border-right:none;margin-left:auto}
+.pg-clients .d-charges .ci:last-child {border-right:none}
 .pg-clients .d-charges .ci .l {font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase}
 .pg-clients .d-charges .ci .v {font-family:'JetBrains Mono';font-size:12px;font-weight:600}
 .pg-clients /* range chips */
