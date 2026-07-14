@@ -642,7 +642,7 @@ function TradesTable({ trades }) {
   return (
     <div className="tscroll" style={{ margin: '8px 8px 12px' }}>
       <table><thead><tr>
-        <th>Date</th><th>Symbol</th><th className="num">Size</th>
+        <th>Date</th><th>Contract</th><th className="num">Size</th>
         <th className="num">Entry</th><th className="num">Exit</th><th className="num">Points</th><th className="num">Net PnL</th>
         <th className="num">Combined P/L</th><th className="num">Combined %</th>
       </tr></thead><tbody>
@@ -660,7 +660,7 @@ function TradesTable({ trades }) {
           return (
             <tr key={i}>
               <td className="m">{fDate(t.date)}</td>
-              <td>{t.underlying}</td>
+              <td className="m">{t.contract || t.underlying}</td>
               <td className="num m">{t.lots} lots</td>
               <td className="num m">{fmtNum(t.entry)}</td>
               <td className="num m">{fmtNum(t.exit)}</td>
