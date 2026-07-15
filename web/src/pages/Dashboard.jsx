@@ -36,7 +36,7 @@ export default function Dashboard() {
   const { data: d, isError, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => apiGet('/api/dashboard'),
-    refetchInterval: 60000,        // live: re-mark open pair + Today to the current price every minute
+    refetchInterval: () => 62000 - (Date.now() % 60000),  // align to ~:02 each minute (after the backend's :00 close-fetch)
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     staleTime: 0,

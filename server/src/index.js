@@ -4,7 +4,7 @@ import cors from '@fastify/cors'
 import { pool } from './db/pg.js'
 import { duckQuery, PARQUET } from './db/duck.js'
 import { dashboardHandler } from './routes/dashboard.js'
-import { getLiveMarket } from './data/liveMarket.js'
+import { getLiveMarket, startMinuteScheduler } from './data/liveMarket.js'
 import { clientsHandler } from './routes/clients.js'
 import { ordersHandler  } from './routes/orders.js'
 import { strategiesHandler } from './routes/strategies.js'
@@ -52,9 +52,9 @@ app.get('/api/data-summary', async () => {
 try {
   await app.listen({ port: PORT, host: '0.0.0.0' })
   console.log(`[pairdesk] server running on http://0.0.0.0:${PORT}`)
-  // Pre-warm the live-market cache (downloads the scrip master + resolves futures tokens) so the
-  // first dashboard request isn't hit with the ~7s cold start. Fire-and-forget; never throws.
-  getLiveMarket().then(() => console.log('[pairdesk] live market pre-warmed')).catch(() => {})
+  // Fetch the live futures quote on each wall-clock minute close (HH:MM:00) — see liveMarket.js.
+  // Also warms the cache immediately so the first request has data.
+  startMinuteScheduler()
 } catch (err) {
   app.log.error(err)
   process.exit(1)

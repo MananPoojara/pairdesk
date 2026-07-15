@@ -137,12 +137,12 @@ async function resolveFutTokens() {
   return downloadFutTokens()                                                                       // first run / expired: must download now
 }
 
-// ── quote (result cached; concurrent callers share one in-flight fetch) ──────────
-// TTL is kept BELOW the frontend's 60s poll so every poll gets a freshly-fetched LTP (a 60s
-// cache coupled to a 60s poll leaves the UI stale up to ~2 min). Two endpoints polling ~60s with
-// a small fixed offset still de-dupe to ~1 broker call/min via this cache + the in-flight share.
+// ── quote — fetched on a WALL-CLOCK minute schedule (see startMinuteScheduler) so the shown
+// price is each 1-minute candle's close. API requests just read this cache; the scheduler is the
+// only regular fetcher (~1 broker call/min at HH:MM:00). STALE_MS is a safety fallback for
+// requests that arrive before the scheduler has run (startup) or if it ever stalls.
 let _quote = null, _quoteAt = 0, _inflight = null
-const TTL = 30_000
+const STALE_MS = 90_000
 
 async function doFetch() {
   const e = creds()
@@ -179,10 +179,8 @@ async function doFetch() {
   return out
 }
 
-// Returns { updated, nifty:{ltp,change,pct,prev_close}, midcap:{...}, banknifty:{...} } or the last
-// good snapshot from disk. Never throws — callers get null-safe data and can fall back further.
-export async function getLiveMarket() {
-  if (_quote && Date.now() - _quoteAt < TTL) return _quote
+// One in-flight fetch shared by concurrent callers; never throws (falls back to stale / disk).
+function fetchNow() {
   if (_inflight) return _inflight
   _inflight = doFetch()
     .catch(err => {
@@ -192,6 +190,30 @@ export async function getLiveMarket() {
     })
     .finally(() => { _inflight = null })
   return _inflight
+}
+
+// Returns the latest minute-close quote (kept fresh by the scheduler). Falls back to an on-demand
+// fetch only if the cache is missing or has gone stale (> STALE_MS). Never throws.
+export async function getLiveMarket() {
+  if (_quote && Date.now() - _quoteAt < STALE_MS) return _quote
+  return fetchNow()
+}
+
+// ── wall-clock minute scheduler ──────────────────────────────────────────────────
+// Fires just after each HH:MM:00 boundary so the fetched LTP is that minute's close (lands in the
+// :59→:01 window). Re-aligns every tick (no setInterval drift) and is independent of restart time
+// (a 10:34:20 restart still fetches at 10:35:00, 10:36:00, …). Epoch-ms minute boundaries line up
+// with IST minute boundaries (the +5:30 offset is a whole number of minutes).
+let _schedTimer = null
+function scheduleTick() {
+  const msToNext = 60_000 - (Date.now() % 60_000)
+  _schedTimer = setTimeout(() => { fetchNow().catch(() => {}); scheduleTick() }, msToNext + 250)
+  if (_schedTimer.unref) _schedTimer.unref()          // don't keep the process alive on its own
+}
+export function startMinuteScheduler() {
+  if (_schedTimer) return
+  fetchNow().then(() => console.log('[liveMarket] pre-warmed')).catch(() => {})   // immediate warm
+  scheduleTick()
 }
 
 // Synchronous last-known snapshot (disk) — for callers that can't await (kept for compatibility).
