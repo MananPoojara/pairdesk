@@ -691,7 +691,7 @@ function TradesTable({ trades }) {
             <tr key={i}>
               <td className="m">{fDate(t.date)}</td>
               <td className="m">{t.contract || t.underlying}</td>
-              <td className="num m">{fmtNum(t.lots * t.lot_size)}</td>
+              <td className="num m">{fmtNum(t.lots * t.lot_size, 0)}</td>
               <td className="num m">{fmtNum(t.entry)}</td>
               <td className="num m">{fmtNum(t.exit)}</td>
               <td className="num m" style={{ color: 'var(--muted)' }}>{(t.net_inr >= 0 ? '+' : '') + pts}</td>
