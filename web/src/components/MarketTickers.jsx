@@ -27,9 +27,9 @@ export default function MarketTickers({ dash }) {
   const midPos = dash?.positions?.find(p => p.underlying === 'MIDCPNIFTY')
   return (
     <>
-      <Ticker name="NIFTY 50" t={t.nifty} fallback={niftyPos} />
-      <Ticker name="MIDCAP SELECT" t={t.midcap} fallback={midPos} />
-      <Ticker name="NIFTY BANK" t={t.banknifty} />
+      <Ticker name="NIFTY FUT" t={t.nifty} fallback={niftyPos} />
+      <Ticker name="MIDCAP FUT" t={t.midcap} fallback={midPos} />
+      <Ticker name="BANKNIFTY FUT" t={t.banknifty} />
     </>
   )
 }
