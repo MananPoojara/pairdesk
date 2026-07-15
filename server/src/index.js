@@ -52,6 +52,9 @@ app.get('/api/data-summary', async () => {
 try {
   await app.listen({ port: PORT, host: '0.0.0.0' })
   console.log(`[pairdesk] server running on http://0.0.0.0:${PORT}`)
+  // Pre-warm the live-market cache (downloads the scrip master + resolves futures tokens) so the
+  // first dashboard request isn't hit with the ~7s cold start. Fire-and-forget; never throws.
+  getLiveMarket().then(() => console.log('[pairdesk] live market pre-warmed')).catch(() => {})
 } catch (err) {
   app.log.error(err)
   process.exit(1)
