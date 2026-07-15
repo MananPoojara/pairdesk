@@ -37,7 +37,9 @@ export default function Dashboard() {
     queryKey: ['dashboard'],
     queryFn: () => apiGet('/api/dashboard'),
     refetchInterval: 60000,        // live: re-mark open pair + Today to the current price every minute
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
+    staleTime: 0,
   })
 
   const [mode, setMode] = useState('overall')   // overall | today

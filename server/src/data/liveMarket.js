@@ -97,31 +97,52 @@ async function login() {
   return jwt
 }
 
-// ── near-month futures tokens (scrip master; cached per-day, re-resolved on rollover) ────
-let _futTok = null, _futDay = null
-async function resolveFutTokens() {
-  const now = new Date()
-  const dayKey = now.toISOString().slice(0, 10)
-  const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  // Reuse if resolved today AND every near-month contract is still un-expired.
-  if (_futTok && _futDay === dayKey && Object.values(_futTok).every(v => v.expiryMs >= todayMs)) return _futTok
-  const r = await fetch(SCRIP_URL, { signal: AbortSignal.timeout(30000) })
+// ── near-month futures tokens ────────────────────────────────────────────────────
+// The scrip master is a 34MB download that can take 30-40s on a slow link. To keep it OFF the
+// quote path, resolved tokens are persisted to disk and reused across restarts; a day-old cache
+// is still valid (tokens only change at monthly expiry), and a stale cache is refreshed in the
+// BACKGROUND so the price fetch never blocks on the big download.
+const FUT_TOKENS_PATH = join(HERE, 'fut_tokens.json')
+let _futTok = null, _futDay = null, _futRefreshing = false
+const todayMs = () => { const n = new Date(); return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()) }
+const dayKey = () => new Date().toISOString().slice(0, 10)
+const futValid = t => t && ['nifty', 'midcap', 'banknifty'].every(k => t[k] && t[k].expiryMs >= todayMs())
+
+async function downloadFutTokens() {
+  const r = await fetch(SCRIP_URL, { signal: AbortSignal.timeout(60000) })
   const all = await r.json()
-  const picked = {}
+  const t = todayMs(), picked = {}
   for (const it of all) {
     if (it.exch_seg !== 'NFO' || it.instrumenttype !== 'FUTIDX') continue
     const key = FUT_NAMES[it.name]; if (!key) continue
-    const ms = parseExpiry(it.expiry); if (ms == null || ms < todayMs) continue   // skip expired
+    const ms = parseExpiry(it.expiry); if (ms == null || ms < t) continue          // skip expired
     if (!picked[key] || ms < picked[key].expiryMs) picked[key] = { token: String(it.token), symbol: it.symbol, expiry: it.expiry, expiryMs: ms }
   }
   if (!picked.nifty || !picked.midcap || !picked.banknifty) throw new Error('futures token resolution incomplete')
-  _futTok = picked; _futDay = dayKey
+  _futTok = picked; _futDay = dayKey()
+  try { writeFileSync(FUT_TOKENS_PATH, JSON.stringify({ day: _futDay, tokens: picked })) } catch { /* read-only fs — ignore */ }
   return picked
 }
+function refreshFutInBackground() {
+  if (_futRefreshing || _futDay === dayKey()) return
+  _futRefreshing = true
+  downloadFutTokens().catch(e => console.warn('[liveMarket] fut token refresh failed:', e.message)).finally(() => { _futRefreshing = false })
+}
+async function resolveFutTokens() {
+  if (futValid(_futTok)) { if (_futDay !== dayKey()) refreshFutInBackground(); return _futTok }   // in-memory
+  try {                                                                                            // disk
+    const disk = JSON.parse(readFileSync(FUT_TOKENS_PATH, 'utf8'))
+    if (futValid(disk?.tokens)) { _futTok = disk.tokens; _futDay = disk.day; if (_futDay !== dayKey()) refreshFutInBackground(); return _futTok }
+  } catch { /* no/invalid disk cache */ }
+  return downloadFutTokens()                                                                       // first run / expired: must download now
+}
 
-// ── quote (result cached 60s; concurrent callers share one in-flight fetch) ──────
+// ── quote (result cached; concurrent callers share one in-flight fetch) ──────────
+// TTL is kept BELOW the frontend's 60s poll so every poll gets a freshly-fetched LTP (a 60s
+// cache coupled to a 60s poll leaves the UI stale up to ~2 min). Two endpoints polling ~60s with
+// a small fixed offset still de-dupe to ~1 broker call/min via this cache + the in-flight share.
 let _quote = null, _quoteAt = 0, _inflight = null
-const TTL = 60_000
+const TTL = 30_000
 
 async function doFetch() {
   const e = creds()

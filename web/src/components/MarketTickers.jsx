@@ -19,8 +19,10 @@ export default function MarketTickers({ dash }) {
   const { data: tk } = useQuery({
     queryKey: ['tickers'],
     queryFn: () => apiGet('/api/tickers'),
-    refetchInterval: 60000,        // live-refresh every minute
+    refetchInterval: 60000,             // live-refresh every minute
+    refetchIntervalInBackground: true,  // keep polling even when the tab isn't focused
     refetchOnWindowFocus: true,
+    staleTime: 0,                        // always treat as stale so the interval never no-ops
   })
   const t = tk || {}
   const niftyPos = dash?.positions?.find(p => p.underlying === 'NIFTY')
