@@ -2,16 +2,18 @@ import { Fragment, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPatch } from '../api/client'
 import MarketTickers from '../components/MarketTickers'
+import LegPerformanceModal from '../components/LegPerformanceModal'
 import { fCr, fCr1, fL, pctStr, fDate, fMonSh } from '../lib/clientsFmt'
 import {
   cellLbl,
   filterMonthly, filterTrades, computeStats,
   RANGES, RLBL, RFULL, CAT_ORDER, CAT_CLS, CAT_LBL, CAT_RANGE,
 } from '../lib/clientsChart'
-import { hmColor, hmText } from '../lib/curve'   // dashboard heatmap palette (colour by %, not ₹)
+import { hmColor, hmText } from '../lib/curve'   // dashboard heatmap palette (colour by %, not )
 import {
   buildBacktestRows,
   buildDateCurvePath,
+  compoundYearlyPct,
   dateLinePoints,
   equityDomain,
   equityValueDomain,
@@ -19,6 +21,12 @@ import {
 import { fmtNum } from '../lib/format'
 import { VARIANTS } from '../lib/variantData'
 import { VARIANT_TRADES } from '../lib/variantTrades'
+import { clientVariantBook } from '../lib/lotCalc'
+import { periodMaxDdPct } from '../lib/returns'
+import { capitalSchedule } from '../lib/capitalSchedule'
+import { useEscClose } from '../lib/useEscClose'
+import { formatMonthlyReturn } from '../lib/dashboardPresentation'
+import { FloatingTooltip } from '../components/ViewportTooltip'
 import './clients.css'
 
 const CURVE_W = 800
@@ -27,8 +35,11 @@ const CURVE_PAD = 18
 
 export default function Clients() {
   const qc = useQueryClient()
-  const { data, isError, error } = useQuery({ queryKey: ['clients'], queryFn: () => apiGet('/api/clients') })
-  const { data: dash } = useQuery({ queryKey: ['dashboard'], queryFn: () => apiGet('/api/dashboard') })
+  // Poll on the same :02-aligned 60s cadence as the ticker so the open-cycle live LTP (exit + PnL)
+  // stays current in the Combined (server-marked recent_trades) and BankNifty (tk live LTP) tables.
+  const live = { refetchInterval: () => 62000 - (Date.now() % 60000), refetchIntervalInBackground: true, staleTime: 0 }
+  const { data, isError, error } = useQuery({ queryKey: ['clients'], queryFn: () => apiGet('/api/clients'), ...live })
+  const { data: dash } = useQuery({ queryKey: ['dashboard'], queryFn: () => apiGet('/api/dashboard'), ...live })
   const [openCode, setOpenCode] = useState(null)
   const [q, setQ] = useState('')
   const [selectedCat, setSelectedCat] = useState(null)   // null = all categories
@@ -52,10 +63,9 @@ export default function Clients() {
         <div className="pagehd fu">
           <div>
             <div className="title">Clients</div>
-            <div className="crumb">
-              {isError ? `API error: ${String(error?.message)}` : !data ? 'Loading…' :
-                `${data.clients.length} client${data.clients.length !== 1 ? 's' : ''} · ₹${data.summary.total_aum_cr.toFixed(1)} Cr AUM · net +₹${data.summary.total_net_cr.toFixed(2)} Cr`}
-            </div>
+            {(isError || !data) && (
+              <div className="crumb">{isError ? `API error: ${String(error?.message)}` : 'Loading…'}</div>
+            )}
           </div>
           <div className="controls">
             <input className="srch" placeholder="⌕ Search client…" value={q}
@@ -95,7 +105,7 @@ export default function Clients() {
                           {openCode === c.code && openCl && (
                             <tr className="drawer-row">
                               <td colSpan={9} style={{ padding: '0 12px', borderBottom: 0 }}>
-                                <Drawer cl={openCl} backtest={dash?.backtest?.series} backtestBaseAum={dash?.backtest?.base_aum_cr ?? 30} onClose={() => setOpenCode(null)} />
+                                <Drawer cl={openCl} backtest={dash?.backtest?.series} backtestBaseAum={dash?.backtest?.base_aum_cr ?? 30} liveLtp={{ NIFTY: tk.nifty, MIDCPNIFTY: tk.mid }} onClose={() => setOpenCode(null)} />
                               </td>
                             </tr>
                           )}
@@ -142,6 +152,7 @@ function fixedInput(n, places = 2) {
 }
 
 function CapitalModal({ client, onClose, onSaved }) {
+  useEscClose(onClose)
   const strategies = client.strategies?.length
     ? client.strategies
     : [{ code: 'MIDCAP_NIFTY_PAIR', name: 'Pair Trading (Midcap × Nifty)', allocation_cr: client.aum_cr, exposure_cr: client.aum_cr, leverage: 1 }]
@@ -247,7 +258,7 @@ function CapitalModal({ client, onClose, onSaved }) {
               {strategies.map(s => <option key={s.code} value={s.code}>{s.name || s.code}</option>)}
             </select>
           </div>
-          <div className="field"><label>Client total capital (₹ Cr)</label>
+          <div className="field"><label>Client total capital (Cr)</label>
             <input type="number" min="0.01" step="0.01" value={aumCr}
               onChange={e => {
                 const v = e.target.value
@@ -257,12 +268,12 @@ function CapitalModal({ client, onClose, onSaved }) {
                 if (alloc > cap) syncAllocation(v)
               }} />
           </div>
-          <div className="field"><label>{strategy?.name || 'Strategy'} allocation (₹ Cr)</label>
+          <div className="field"><label>{strategy?.name || 'Strategy'} allocation (Cr)</label>
             <input type="number" min="0" step="0.01" value={allocationCr}
               onChange={e => syncAllocation(e.target.value)} />
           </div>
           <div style={{ display: 'flex', gap: 14 }}>
-            <div className="field" style={{ flex: 1 }}><label>{strategy?.name || 'Strategy'} exposure (₹ Cr)</label>
+            <div className="field" style={{ flex: 1 }}><label>{strategy?.name || 'Strategy'} exposure (Cr)</label>
               <input type="number" min="0" step="0.01" value={exposureCr}
                 onChange={e => syncExposure(e.target.value)} />
             </div>
@@ -271,10 +282,10 @@ function CapitalModal({ client, onClose, onSaved }) {
                 onChange={e => syncLeverage(e.target.value)} />
             </div>
           </div>
-          <div style={{ background: 'var(--soft)', borderRadius: 10, padding: '10px 12px', fontSize: 11.5, color: 'var(--muted)', fontWeight: 600 }}>
+          <div style={{ background: 'var(--soft)', borderRadius: 10, padding: '10px 12px', fontSize: '0.71875rem', color: 'var(--muted)', fontWeight: 600 }}>
             This persists to Postgres. Client capital is the account-level AUM; allocation, exposure, and leverage are stored independently on this strategy mapping.
           </div>
-          {err && <div style={{ color: 'var(--neg)', fontSize: 12, fontWeight: 700, marginTop: 10 }}>{err}</div>}
+          {err && <div style={{ color: 'var(--neg)', fontSize: '0.75rem', fontWeight: 700, marginTop: 10 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
             <button className="btn ghost" onClick={onClose} disabled={saving}>Cancel</button>
             <button className="btn" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save capital'}</button>
@@ -333,11 +344,11 @@ function ClientCard({ c, cls, cat, idx, active, onToggle, onEdit }) {
         <div className="kv"><div className="l">Return</div><div className={'v ' + nc}>{pctStr(c.stats.return_pct)}</div></div>
       </div>
       <div className="alloc-row">
-        <div><span>Allocation</span><b>{fCr(allocationCr)}</b><span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 3 }}>{allocPct}%</span></div>
+        <div><span>Allocation</span><b>{fCr(allocationCr)}</b><span style={{ fontSize: '0.625rem', color: 'var(--muted)', marginLeft: 3 }}>{allocPct}%</span></div>
         <div><span>Exposure</span><b>{fCr(exposureCr)}</b></div>
         <div><span>Lev</span><b>{fmtLev(leverage)}</b></div>
       </div>
-      <div style={{ fontSize: 8.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', margin: '9px 2px 0' }}>Net Exposure (long / short)</div>
+      <div style={{ fontSize: '0.53125rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', margin: '9px 2px 0' }}>Net Exposure (long / short)</div>
       <div className="alloc-row" style={{ marginTop: 4 }}>
         <div><span>Long · Midcap</span><b>{fCr(legExpCr)}</b></div>
         <div><span>Short · Nifty</span><b>{fCr(legExpCr)}</b></div>
@@ -346,7 +357,7 @@ function ClientCard({ c, cls, cat, idx, active, onToggle, onEdit }) {
       <div className="mini">
         <div className="b"><div className="l">Sharpe</div><div className="v">{c.stats.sharpe}</div></div>
         <div className="b"><div className="l">Win rate</div><div className="v u">{c.stats.win_rate}%</div></div>
-        <div className="b"><div className="l">Max DD</div><div className="v d">−{c.stats.max_dd_pct}%</div></div>
+        <div className="b"><div className="l">Max DD</div><div className="v d">−{periodMaxDdPct(c.monthly)}%</div></div>
       </div>
       <span className={'strat-chip' + (active ? ' active' : '')} onClick={onToggle}>
         ● Pair Trading<span className="arr">▾</span>
@@ -367,7 +378,7 @@ function ClientRow({ c, active, onClick }) {
     <tr className={'clist-row' + (active ? ' active' : '')} onClick={onClick}>
       <td className="m">{fDate(c.joined_at)}</td>
       <td><div className="clr-name"><b>{c.name}</b><span className={'chiplbl sm ' + CAT_CLS[c.category]}>{CAT_LBL[c.category]}</span></div></td>
-      <td><span className="instr-chip" title={instr === 'F2O' ? 'Fut × Option pair (Midcap fut × Nifty option)' : 'Fut × Fut pair (Midcap fut × Nifty fut)'}>{instr}</span></td>
+      <td><span className="instr-chip" data-tooltip={instr === 'F2O' ? 'Future × Option pair (Midcap future × Nifty option)' : 'Future × Future pair (Midcap future × Nifty future)'}>{instr}</span></td>
       <td className="num m">{fCr(capCr)}</td>
       <td className={'num m ' + nc}>{fL(net)}</td>
       <td className="num m"><b>{fCr(curValCr)}</b></td>
@@ -378,65 +389,152 @@ function ClientRow({ c, active, onClick }) {
   )
 }
 
-function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
+// Contract display name from the EXPIRY date: {UNDERLYING}{DD}{MMM}{YYYY}FUT (e.g. MIDCPNIFTY28JUL2026FUT).
+const MON3 = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+const futContract = (underlying, expiry) => {
+  const [Y, M, D] = String(expiry).slice(0, 10).split('-')
+  return `${underlying}${D}${MON3[+M - 1]}${Y}FUT`
+}
+
+function Drawer({ cl, backtest, backtestBaseAum, liveLtp, onClose }) {
+  useEscClose(onClose)
   const [rangeKey, setRangeKey] = useState('all')
-  const [dInstr, setDInstr] = useState('fut')    // fut | opt
+  const [dInstr, setDInstr] = useState(cl.exec_type === 'F2O' ? 'opt' : 'fut')    // default to the client's own execution
   const [dIdx, setDIdx] = useState('combined')   // combined | banknifty
   const [returnBase, setReturnBase] = useState('capital')  // capital | cash (Return-on-Cash toggle)
+  const [monthModal, setMonthModal] = useState(null)
+  // Real F2O option trade book (from the DB); falls back to the hardcoded showcase data if the API
+  // is unavailable (e.g. deployed frontend before option_trades is ingested to prod).
+  const { data: optData } = useQuery({ queryKey: ['option-trades'], queryFn: () => apiGet('/api/option-trades'), staleTime: Infinity })
+  const { data: lotSizes } = useQuery({ queryKey: ['lot-sizes'], queryFn: () => apiGet('/api/lot-sizes'), staleTime: 60_000 })
+  const { data: chargeConfig } = useQuery({ queryKey: ['charge-config'], queryFn: () => apiGet('/api/charge-config'), staleTime: 60_000 })
+  // Per-client OPTIONS book: real discrete lots + itemised charges + margin, computed server-side
+  // (parity with the futures buildClientBook). Fetched only when the Options toggle is active.
+  const { data: optBookData } = useQuery({
+    queryKey: ['client-options', cl.code],
+    queryFn: () => apiGet('/api/clients/' + cl.code + '/options'),
+    enabled: dInstr === 'opt', staleTime: Infinity,
+  })
+  const optBook = dInstr === 'opt' ? optBookData : null
   const catCls = CAT_CLS[cl.category] || 'retail'
   const catLbl = CAT_LBL[cl.category] || cl.category.toUpperCase()
   const strategy = primaryStrategy(cl)
   const allocationCr = strategy?.allocation_cr ?? cl.aum_cr
   const exposureCr = strategy?.exposure_cr ?? allocationCr
   const leverage = strategy?.leverage ?? (allocationCr > 0 ? exposureCr / allocationCr : 0)
+  // Capital timeline (pay-in / pay-out) for THIS client — drives the variant book's segmented sizing +
+  // per-month return base, exactly like the server fut book. Null when the client has no events.
+  const vSched = cl.capital_events?.length ? capitalSchedule(cl.capital_events, leverage) : null
   const cashCr = strategy?.cash_cr ?? allocationCr                            // cash share of allocation
   const pledgeCr = strategy?.pledge_cr ?? Math.max(0, allocationCr - cashCr)  // stock-pledge share
   // Return-on-Cash toggle: re-base every % stat (return, MoM, best month, Max DD) onto the CASH
-  // portion instead of full capital. ₹ amounts, Sharpe and win-rate are base-invariant.
+  // portion instead of full capital.  amounts, Sharpe and win-rate are base-invariant.
   const onCash = returnBase === 'cash'
   const baseCr = onCash ? (cashCr || allocationCr) : allocationCr
   const aumInr = baseCr * 1e7                // RETURN % base — capital or cash per the toggle
   const deployedInr = exposureCr * 1e7       // deployed (capital × leverage) — the base P&L runs on
-  // Variant toggle: Options / BankNifty take the 30 Cr backtest and scale ₹ to THIS client's
+  // Variant toggle: Options / BankNifty take the 30 Cr backtest and scale  to THIS client's
   // DEPLOYED capital (exposure = allocation × leverage); return %/Sharpe/DD are the strategy's own.
-  const vActive = dInstr === 'opt' ? VARIANTS.options : dIdx === 'banknifty' ? VARIANTS.banknifty : null
-  const vScale = exposureCr / (vActive?.summary.base_aum_cr || 30)
-  const srcMonthly = vActive
-    ? vActive.monthly.map(m => ({ ...m, net_inr: Math.round(m.net_inr * vScale), gross_inr: Math.round(m.net_inr * vScale), charges_inr: 0, cumulative_inr: Math.round(m.cumulative_inr * vScale) }))
-    : cl.monthly
+  const optPerf = optData?.summary ? optData : VARIANTS.options   // DB-derived options perf (fallback: hardcoded)
+  const vActive = dInstr === 'opt' ? optPerf : dIdx === 'banknifty' ? VARIANTS.banknifty : null
+  const vBaseAum = vActive?.summary.base_aum_cr || 30
+  const vScale = exposureCr / vBaseAum
+  // Options + BankNifty variants: start from the client's join date, like Combined. cl.monthly is the
+  // server's join-filtered fut series, so its first month is the client's first ACTUAL active month —
+  // use it as the variant floor (hides pre-join months; Options book spans back to Mar 2019).
+  const vFloor = (dIdx === 'banknifty' || dInstr === 'opt') ? cl.monthly?.[0]?.month : null
+  // BankNifty: recompute per client from its 30 Cr trades with REAL rounded lot quantities (same model
+  // as the fut Combined book) — drives MoM/stats/trades/PnL. Options stays on linear NAV-% scaling.
+  const bnfMax = VARIANT_TRADES.banknifty.trades.reduce((mx, t) => (t.expiry > mx ? t.expiry : mx), '')
+  const bnfBook = dIdx === 'banknifty'
+    ? clientVariantBook(VARIANT_TRADES.banknifty.trades, {
+        scaleAt: vSched ? vSched.scaleAt : exposureCr / 30,
+        capitalAt: vSched ? vSched.capitalAt : () => allocationCr,
+        joinFloor: vFloor, liveLtp, maxExpiry: bnfMax, lotHistory: lotSizes?.rows, rates: chargeConfig?.rates })
+    : null
+  let vCum = 0
+  const srcMonthly = bnfBook
+    ? bnfBook.monthly
+    : optBook
+      ? optBook.monthly                                  // server discrete-lot options book (real lots + charges + margin)
+      : vActive
+      ? vActive.monthly
+          .filter(m => !vFloor || m.month >= vFloor)
+          .map(m => {
+            // Only clients with an ACTUAL capital change (a multi-step timeline) get per-month exposure
+            // scaling, so the Options net matches its timeline-aware denominator. Flat-capital clients
+            // (single initial pay-in) keep the old linear scale + basis — genuinely unchanged.
+            const useTimeline = vSched && vSched.steps.length > 1
+            const monthScale = useTimeline ? vSched.exposureAt(m.month) / vBaseAum : vScale
+            const net = Math.round(m.net_inr * monthScale)
+            vCum += net
+            const cap = useTimeline ? Math.round(vSched.capitalAt(m.month) * 1e7) : null
+            return { ...m, net_inr: net, gross_inr: net, charges_inr: 0, cumulative_inr: useTimeline ? vCum : Math.round(m.cumulative_inr * vScale), capital_inr: cap }
+          })
+      : cl.monthly
   const filtered = filterMonthly(srcMonthly, rangeKey)
-  const stats = computeStats(filtered, aumInr)
-  // Re-base each month's % to the chosen base so the heatmap + best-month track the toggle.
-  const filteredBased = filtered.map(m => ({ ...m, pct: aumInr > 0 ? m.net_inr / aumInr * 100 : 0 }))
+  // Return-on-Cash toggle scales the capital base uniformly: base = capital × (baseCr / allocationCr).
+  const baseFactor = allocationCr > 0 ? baseCr / allocationCr : 1
+  const stats = computeStats(filtered, aumInr, baseFactor)
+  // Per-month base = that month's capital (pay-in/pay-out timeline) × the toggle factor; falls back to
+  // flat aumInr for variant months without capital_inr. Drives the heatmap + best-month %.
+  const baseOf = m => (m.capital_inr != null && m.capital_inr > 0) ? m.capital_inr * baseFactor : aumInr
+  const filteredBased = filtered.map(m => { const b = baseOf(m); return { ...m, pct: b > 0 ? m.net_inr / b * 100 : 0 } })
   const bestMoPct = filteredBased.length ? Math.max(...filteredBased.map(m => m.pct)) : 0
-  // Drawdown ratio scales inversely with the base: DD_cash = DD_capital × (capital / cash).
-  const ddFactor = onCash && cashCr > 0 ? allocationCr / cashCr : 1
-  const pairMaxDd = (vActive ? Number(vActive.summary.pair_max_dd_pct)
-    : Number(cl.stats?.pair_max_dd_pct ?? cl.stats?.max_dd_pct ?? stats.max_dd_pct)) * ddFactor
-  const trades = vActive ? [] : filterTrades(cl.recent_trades, filtered)
+  // Timeframe-aware Max DD on the capital timeline (Combined) or flat base (variants), toggle-adjusted
+  // via baseFactor — cash-flow-neutral, so a pay-in/pay-out never shows as a drawdown.
+  const pairMaxDd = stats.max_dd_pct
+  const trades = vActive ? [] : filterTrades(cl.recent_trades, filtered).map(t => ({ ...t, contract: futContract(t.underlying, t.expiry), net_pct: aumInr > 0 ? +(t.net_inr / aumInr * 100).toFixed(2) : 0 }))
+  // the currently-open fut cycle = most-recent expiry in the live book (its Date cell gets highlighted)
+  const openExpiry = (cl.recent_trades || []).reduce((mx, t) => (t.expiry > mx ? t.expiry : mx), '')
   const ch = cl.charges, chT = ch.total_inr || 1
   const nc = stats.net_inr >= 0 ? 'u' : 'd', rc = stats.return_pct >= 0 ? 'u' : 'd'
   const vScaledCr = vActive ? (allocationCr).toFixed(vScale < 1 ? 2 : 0) : null
 
-  // Real per-trade blotter for the active variant (from the source Excels), ₹ scaled to allocation.
+  // Real per-trade blotter for the active variant (from the source Excels),  scaled to allocation.
   const vKey = dInstr === 'opt' ? 'options' : dIdx === 'banknifty' ? 'banknifty' : null
   const vTrades = vKey === 'banknifty'
-    ? VARIANT_TRADES.banknifty.trades.map(t => ({
-        ...t,
-        lots: Math.max(1, Math.round(t.lots * vScale)),
-        net_inr: Math.round(t.net_inr * vScale),
-        combined_pl_inr: Math.round(t.combined_pl_inr * vScale),
-      }))
+    ? bnfBook.trades
+        .map(g => {
+          const net_inr = Math.round(g.net)
+          return {
+            date: g.date, underlying: g.underlying, expiry: g.expiry, direction: g.direction, entry: g.entry, exit: g.exit,
+            contract: futContract(g.underlying, g.expiry),
+            lots: g.cQty / g.lot, lot_size: g.lot,   // Size = lots × lot_size = client's rounded qty
+            net_inr,
+            net_pct: aumInr > 0 ? +(net_inr / aumInr * 100).toFixed(2) : 0,   // Net PnL % in bracket, like Combined
+            combined_pl_inr: Math.round(g.combined),
+            combined_pct: aumInr > 0 ? +(g.combined / aumInr * 100).toFixed(2) : 0,
+          }
+        })
+        // latest first (by expiry month desc, then underlying) — matches the Combined/fut order
+        .sort((a, b) => { const am = a.expiry.slice(0, 7), bm = b.expiry.slice(0, 7); return am < bm ? 1 : am > bm ? -1 : (a.underlying < b.underlying ? -1 : 1) })
     : vKey === 'options'
-    ? VARIANT_TRADES.options.trades.map(t => ({ ...t, net_inr: Math.round(t.pct / 100 * deployedInr) }))
+    ? (optBook
+        ? optBook.recent.map(t => ({                        // real per-client lots + charges (server book)
+            strategy: t.strategy, entry: t.entry, exit: t.exit, expiry: t.expiry,
+            buy_sell: t.side, strike: t.strike, opt_type: t.opt_type, qty: t.opt_qty,
+            opt_entry: t.opt_entry, opt_exit: t.opt_exit,
+            net_inr: Math.round(t.net), pct: aumInr > 0 ? +(t.net / aumInr * 100).toFixed(2) : 0,
+          }))
+        : (optData?.trades || VARIANT_TRADES.options.trades).map(t => ({ ...t, net_inr: Math.round(t.pct / 100 * deployedInr) })))
     : []
-  // BankNifty charges (STT/exchange/SEBI/stamp/GST) scaled to allocation, in the live footer's shape.
+  // BankNifty charges: total is qty-driven (from the rounded-lot book); split into STT/exch/SEBI/stamp/GST
+  // by the source book's component proportions (per-cycle split isn't in the variant data).
   const vc = VARIANT_TRADES.banknifty.charges_inr
+  const vChF = vKey === 'banknifty' && vc.total ? bnfBook.charges / vc.total : 0
   const vCh = vKey === 'banknifty' ? {
-    stt_inr: Math.round(vc.stt * vScale), exch_inr: Math.round(vc.exch * vScale),
-    sebi_inr: Math.round(vc.sebi * vScale), stamp_inr: Math.round(vc.stamp * vScale),
-    gst_inr: Math.round(vc.gst * vScale), total_inr: Math.round(vc.total * vScale),
+    stt_inr: Math.round(vc.stt * vChF), exch_inr: Math.round(vc.exch * vChF),
+    sebi_inr: Math.round(vc.sebi * vChF), stamp_inr: Math.round(vc.stamp * vChF),
+    gst_inr: Math.round(vc.gst * vChF), total_inr: Math.round(bnfBook.charges),
   } : null
+  // Options: itemised charges + margin from the server discrete-lot book.
+  const oCh = optBook ? {
+    stt_inr: Math.round(optBook.charges.stt), exch_inr: Math.round(optBook.charges.exch),
+    sebi_inr: Math.round(optBook.charges.sebi), stamp_inr: Math.round(optBook.charges.stamp),
+    gst_inr: Math.round(optBook.charges.gst), total_inr: Math.round(optBook.charges.total),
+  } : null
+  const oMarginCr = optBook ? optBook.margin / 1e7 : null
 
   return (
     <div className="drawer-wrap open">
@@ -449,14 +547,14 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
         </div>
 
         <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '13px 18px', background: '#fff', borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Index</span>
+          <span style={{ fontSize: '0.59375rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Index</span>
           {[['combined', 'Combined'], ['banknifty', 'BankNifty']].map(([k, label]) => (
             <button key={k} disabled={dInstr === 'opt'} className={'chip' + (dIdx === k ? ' on' : '')}
               onClick={() => dInstr !== 'opt' && setDIdx(k)}>{label}</button>
           ))}
-          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 10 }}>Instrument</span>
-          <button className={'chip' + (dInstr === 'fut' ? ' on' : '')} onClick={() => setDInstr('fut')}>Fut</button>
-          <button className={'chip' + (dInstr === 'opt' ? ' on' : '')} onClick={() => setDInstr('opt')}>Options</button>
+          <span style={{ fontSize: '0.59375rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 10 }}>Instrument</span>
+          {cl.exec_type !== 'F2O' && <button className={'chip' + (dInstr === 'fut' ? ' on' : '')} onClick={() => setDInstr('fut')}>Future</button>}
+          {cl.exec_type !== 'F2F' && <button className={'chip' + (dInstr === 'opt' ? ' on' : '')} onClick={() => setDInstr('opt')}>Options</button>}
           {/* time-range chips pushed to the right */}
           <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
             {RANGES.map(r => (
@@ -464,20 +562,16 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
             ))}
           </div>
         </div>
-        {vActive && (
-          <div style={{ margin: '8px 18px 0', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{vActive.summary.name.replace('Pair Trading — ', '')} variant</span>
-            <span style={{ color: 'var(--muted)' }}>{vActive.summary.subtitle} · backtest scaled to {fCr(allocationCr)} allocation ({pctStr(vActive.summary.return_pct)} on {vActive.summary.base_aum_cr} Cr → {fL(Math.round(vActive.summary.net_inr * vScale))})</span>
-          </div>
-        )}
 
         <div className="var-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '12px 18px' }}>
-          <span style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Return basis</span>
-          <button className={'chip' + (!onCash ? ' on' : '')} onClick={() => setReturnBase('capital')}>On Capital</button>
-          <button className={'chip' + (onCash ? ' on' : '')} onClick={() => setReturnBase('cash')}>On Cash</button>
-          <span style={{ fontSize: 10.5, color: 'var(--muted)', marginLeft: 4 }}>
+          <span style={{ fontSize: '0.65625rem', color: 'var(--muted)' }}>
             cash {fCr(cashCr)} · pledge {fCr(pledgeCr)} of {fCr(allocationCr)} capital
           </span>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
+            <span style={{ fontSize: '0.59375rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Return on</span>
+            <button className={'chip' + (!onCash ? ' on' : '')} onClick={() => setReturnBase('capital')}>On Capital</button>
+            <button className={'chip' + (onCash ? ' on' : '')} onClick={() => setReturnBase('cash')}>On Cash</button>
+          </div>
         </div>
 
         <div className="d-hero">
@@ -494,8 +588,8 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
 
         <div className="d-sec">
           <div className="d-sec-l">Month-on-Month Net Returns · % of {onCash ? 'cash deployed' : 'strategy allocation'}</div>
-          <Heatmap monthly={filteredBased} />
-          <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
+          <div className="hmx hmx-top" style={{ gridTemplateColumns: '34px repeat(13,1fr)' }}><span></span>{['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'].map((m, i) => <span key={i}>{m}</span>)}<span>YEAR</span></div>
+          <Heatmap monthly={filteredBased} onCellClick={setMonthModal} />
         </div>
 
         <div className="d-sec">
@@ -522,65 +616,75 @@ function Drawer({ cl, backtest, backtestBaseAum, onClose }) {
             <div className="d-trades">
               <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>Trades · {cl.name} · BankNifty backtest · {vTrades.length} legs {vScale !== 1 && `· scaled to ${fCr(allocationCr)}`}</span>
-                <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
+                <button className="btn ghost" style={{ fontSize: '0.6875rem', padding: '4px 10px', marginRight: 8 }}
                   onClick={() => downloadTradesCsv(vTrades, cl.name, cl.code + '_BNF')}>↓ CSV</button>
               </div>
-              <TradesTable trades={vTrades} />
+              <TradesTable trades={vTrades} openExpiry={vTrades.reduce((mx, t) => (t.expiry > mx ? t.expiry : mx), '')} />
             </div>
             <div className="d-charges">
-              <Ci l="STT" v={`₹${(vCh.stt_inr / 1e5).toFixed(1)} L (${(vCh.stt_inr / vCh.total_inr * 100) | 0}%)`} />
-              <Ci l="Exchange" v={`₹${(vCh.exch_inr / 1e5).toFixed(1)} L (${(vCh.exch_inr / vCh.total_inr * 100) | 0}%)`} />
-              <Ci l="SEBI" v={`₹${(vCh.sebi_inr / 1e5).toFixed(1)} L (${(vCh.sebi_inr / vCh.total_inr * 100) | 0}%)`} />
-              <Ci l="Stamp" v={`₹${(vCh.stamp_inr / 1e5).toFixed(1)} L (${(vCh.stamp_inr / vCh.total_inr * 100) | 0}%)`} />
-              <Ci l="GST" v={`₹${(vCh.gst_inr / 1e5).toFixed(1)} L (${(vCh.gst_inr / vCh.total_inr * 100) | 0}%)`} />
-              <Ci l="Total (backtest)" big v={fCr(vCh.total_inr / 1e7)} />
+              <Ci l="STT" v={`${(vCh.stt_inr / 1e5).toFixed(1)} L (${(vCh.stt_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="Exch. Turn." v={`${(vCh.exch_inr / 1e5).toFixed(1)} L (${(vCh.exch_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="SEBI Fees" v={`${(vCh.sebi_inr / 1e5).toFixed(1)} L (${(vCh.sebi_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="Stamp" v={`${(vCh.stamp_inr / 1e5).toFixed(1)} L (${(vCh.stamp_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="GST" v={`${(vCh.gst_inr / 1e5).toFixed(1)} L (${(vCh.gst_inr / vCh.total_inr * 100) | 0}%)`} />
+              <Ci l="Total Charges" big v={fCr(vCh.total_inr / 1e7)} />
             </div>
           </>
         ) : vKey === 'options' ? (
-          <div className="d-trades">
-            <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Trades · {cl.name} · Options backtest · {vTrades.length} trades {vScale !== 1 && `· scaled to ${fCr(allocationCr)}`}</span>
-              <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
-                onClick={() => downloadOptionsCsv(vTrades, cl.name, cl.code)}>↓ CSV</button>
+          <>
+            <div className="d-trades">
+              <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Trades · {cl.name} · {vTrades.length} trades{oMarginCr != null && ` · margin ${fCr(oMarginCr)}`}</span>
+                <button className="btn ghost" style={{ fontSize: '0.6875rem', padding: '4px 10px', marginRight: 8 }}
+                  onClick={() => downloadOptionsCsv(vTrades, cl.name, cl.code)}>↓ CSV</button>
+              </div>
+              <OptionsTradesTable trades={vTrades} />
             </div>
-            <OptionsTradesTable trades={vTrades} />
-            <p style={{ color: 'var(--muted)', fontSize: 11, padding: '2px 18px 12px' }}>
-              5-strategy options club (1st Month · XTROC · Bear Short · M5DP · TROC). Net % is on deployed capital; charges are embedded in the net.
-            </p>
-          </div>
+            {oCh && (
+              <div className="d-charges">
+                <Ci l="STT" v={`${(oCh.stt_inr / 1e5).toFixed(1)} L (${(oCh.stt_inr / oCh.total_inr * 100) | 0}%)`} />
+                <Ci l="Exch. Turn." v={`${(oCh.exch_inr / 1e5).toFixed(1)} L (${(oCh.exch_inr / oCh.total_inr * 100) | 0}%)`} />
+                <Ci l="SEBI Fees" v={`${(oCh.sebi_inr / 1e5).toFixed(1)} L (${(oCh.sebi_inr / oCh.total_inr * 100) | 0}%)`} />
+                <Ci l="Stamp" v={`${(oCh.stamp_inr / 1e5).toFixed(1)} L (${(oCh.stamp_inr / oCh.total_inr * 100) | 0}%)`} />
+                <Ci l="GST" v={`${(oCh.gst_inr / 1e5).toFixed(1)} L (${(oCh.gst_inr / oCh.total_inr * 100) | 0}%)`} />
+                <Ci l="Total Charges" big v={fCr(oCh.total_inr / 1e7)} />
+              </div>
+            )}
+          </>
         ) : (
           <>
             <div className="d-trades">
               <div className="tl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Order Executed · {cl.name} · {trades.length} in range</span>
+                <span>Executed orders · {cl.name} · {trades.length} in range</span>
                 {trades.length > 0 && (
-                  <button className="btn ghost" style={{ fontSize: 11, padding: '4px 10px', marginRight: 8 }}
+                  <button className="btn ghost" style={{ fontSize: '0.6875rem', padding: '4px 10px', marginRight: 8 }}
                     onClick={() => downloadTradesCsv(trades, cl.name, cl.code)}>
                     ↓ CSV
                   </button>
                 )}
               </div>
-              <TradesTable trades={trades} />
+              <TradesTable trades={trades} openExpiry={openExpiry} />
             </div>
 
             <div className="d-charges">
-              <Ci l="STT" v={`₹${(ch.stt_inr / 1e5).toFixed(1)} L`} />
-              <Ci l="Exchange" v={`₹${(ch.exch_inr / 1e5).toFixed(1)} L`} />
-              <Ci l="SEBI" v={`₹${(ch.sebi_inr / 1e5).toFixed(1)} L`} />
-              <Ci l="Stamp" v={`₹${(ch.stamp_inr / 1e5).toFixed(1)} L`} />
-              <Ci l="GST" v={`₹${(ch.gst_inr / 1e5).toFixed(1)} L`} />
-              <Ci l="Total" big v={fCr(ch.total_inr / 1e7)} />
+              <Ci l="STT" v={`${(ch.stt_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="Exch. Turn." v={`${(ch.exch_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="SEBI Fees" v={`${(ch.sebi_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="Stamp" v={`${(ch.stamp_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="GST" v={`${(ch.gst_inr / 1e5).toFixed(1)} L`} />
+              <Ci l="Total Charges" big v={fCr(ch.total_inr / 1e7)} />
             </div>
           </>
         )}
       </div>
+      {monthModal && <LegPerformanceModal period={monthModal} monthly={filteredBased} scaleInr={n => n} onClose={() => setMonthModal(null)} />}
     </div>
   )
 }
 
 const Hk = ({ l, v, cls }) => <div className="hk"><div className="l">{l}</div><div className={'v ' + (cls || '')}>{v}</div></div>
 const Sc = ({ l, v, cls }) => <div className="sc"><div className="l">{l}</div><div className={'v ' + (cls || '')}>{v}</div></div>
-const Ci = ({ l, v, big }) => <div className="ci"><div className="l">{l}</div><div className="v" style={big ? { fontSize: 14 } : undefined}>{v}</div></div>
+const Ci = ({ l, v, big }) => <div className="ci"><div className="l">{l}</div><div className="v" style={big ? { fontSize: '0.875rem' } : undefined}>{v}</div></div>
 
 function downloadTradesCsv(trades, clientName, clientCode) {
   const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -622,10 +726,12 @@ function downloadTradesCsv(trades, clientName, clientCode) {
 }
 
 function downloadOptionsCsv(trades, clientName, clientCode) {
-  const header = ['Strategy', 'Entry', 'Exit', 'Expiry', 'Net %', 'Net PnL (INR)', 'Net PnL (L)']
+  const header = ['Entry', 'Exit', 'Expiry', 'Nifty Option', 'Qty', 'Entry Price', 'Exit Price', 'Net %', 'Net PnL (INR)', 'Net PnL (L)']
   const rows = trades.map(t => [
-    t.strategy, t.entry, t.exit, t.expiry,
-    (t.pct >= 0 ? '+' : '') + t.pct.toFixed(2) + '%',
+    t.entry, t.exit, t.expiry,
+    t.strike != null ? `${t.buy_sell || ''} ${Math.round(t.strike)} ${t.opt_type || ''}`.trim() : '',
+    t.qty ?? '', t.opt_entry ?? '', t.opt_exit ?? '',
+    t.pct.toFixed(2) + '%',
     Math.round(t.net_inr), (t.net_inr / 1e5).toFixed(2),
   ])
   const csv = [header, ...rows]
@@ -641,22 +747,33 @@ function downloadOptionsCsv(trades, clientName, clientCode) {
 }
 
 function OptionsTradesTable({ trades }) {
-  if (!trades.length) return <p style={{ color: 'var(--muted)', fontSize: 12, padding: '12px 18px' }}>No trades found.</p>
-  const STCLS = { '1st Month': 'l', 'XTROC': 's', 'Bear Short': 'd', 'M5DP': 'l', 'TROC': 's' }
+  if (!trades.length) return <p style={{ color: 'var(--muted)', fontSize: '0.75rem', padding: '12px 18px' }}>No trades found.</p>
+  // Show the real Nifty option-leg contract when it's available (DB option_trades); the old hardcoded
+  // showcase rows only carried strategy/dates/pct, so those columns render "—".
+  const hasLegs = trades.some(t => t.strike != null)
   return (
     <div className="tscroll" style={{ margin: '8px 8px 12px', maxHeight: 360, overflowY: 'auto' }}>
       <table><thead><tr>
-        <th>Strategy</th><th>Entry</th><th>Exit</th><th>Expiry</th>
+        <th>Entry</th><th>Exit</th><th>Expiry</th>
+        {hasLegs && <><th>Nifty Option</th><th className="num">Qty</th><th className="num">Entry </th><th className="num">Exit </th></>}
         <th className="num">Net %</th><th className="num">Net PnL</th>
       </tr></thead><tbody>
         {trades.map((t, i) => {
           const nc = t.pct >= 0 ? 'u' : 'd'
+          const contract = t.strike != null
+            ? `${t.buy_sell || ''} ${Math.round(t.strike)} ${t.opt_type || ''}`.trim()
+            : '—'
           return (
             <tr key={i}>
-              <td><span className={'tg2 ' + (STCLS[t.strategy] || 'l')}>{t.strategy}</span></td>
               <td className="m">{fDate(t.entry)}</td>
               <td className="m">{fDate(t.exit)}</td>
               <td className="m">{fDate(t.expiry)}</td>
+              {hasLegs && <>
+                <td className="m">{contract}</td>
+                <td className="num m">{t.qty != null ? fmtNum(t.qty, 0) : '—'}</td>
+                <td className="num m">{t.opt_entry != null ? fmtNum(t.opt_entry) : '—'}</td>
+                <td className="num m">{t.opt_exit != null ? fmtNum(t.opt_exit) : '—'}</td>
+              </>}
               <td className={'num m ' + nc}>{pctStr(t.pct)}</td>
               <td className={'num m ' + nc}>{fL(t.net_inr)}</td>
             </tr>
@@ -667,12 +784,12 @@ function OptionsTradesTable({ trades }) {
   )
 }
 
-function TradesTable({ trades }) {
-  if (!trades.length) return <p style={{ color: 'var(--muted)', fontSize: 12, padding: '12px 18px' }}>No trades found.</p>
+function TradesTable({ trades, openExpiry }) {
+  if (!trades.length) return <p style={{ color: 'var(--muted)', fontSize: '0.75rem', padding: '12px 18px' }}>No trades found.</p>
   return (
     <div className="tscroll" style={{ margin: '8px 8px 12px' }}>
       <table><thead><tr>
-        <th>Date</th><th>Contract</th><th className="num">Size</th>
+        <th>Date</th><th>Symbol</th><th>Expiry</th><th className="num">Quantity</th>
         <th className="num">Entry</th><th className="num">Exit</th><th className="num">Points</th><th className="num">Net PnL</th>
         <th className="num">Combined P/L</th><th className="num">Combined %</th>
       </tr></thead><tbody>
@@ -689,13 +806,14 @@ function TradesTable({ trades }) {
           if (firstOfPair) { let j = i + 1; while (j < trades.length && expMonth(trades[j]) === expMonth(t)) { pairSpan++; j++ } }
           return (
             <tr key={i}>
-              <td className="m">{fDate(t.date)}</td>
-              <td className="m">{t.contract || t.underlying}</td>
+              <td className="m" style={openExpiry && t.expiry === openExpiry ? { background: '#FDE68A' } : undefined}>{fDate(t.date)}</td>
+              <td className="m">{t.underlying}</td>
+              <td className="m">{fDate(t.expiry)}</td>
               <td className="num m">{fmtNum(t.lots * t.lot_size, 0)}</td>
               <td className="num m">{fmtNum(t.entry)}</td>
               <td className="num m">{fmtNum(t.exit)}</td>
-              <td className="num m" style={{ color: 'var(--muted)' }}>{(t.net_inr >= 0 ? '+' : '') + pts}</td>
-              <td className={'num m ' + nc}>{fL(t.net_inr)}</td>
+              <td className="num m" style={{ color: 'var(--muted)' }}>{pts}</td>
+              <td className={'num m ' + nc}>{fL(t.net_inr)}{t.net_pct != null && ` (${pctStr(t.net_pct)})`}</td>
               {firstOfPair && (
                 <td className={'num m pair-cell ' + cc} rowSpan={pairSpan} style={{ verticalAlign: 'middle' }}>{fL(t.combined_pl_inr || 0)}</td>
               )}
@@ -710,7 +828,7 @@ function TradesTable({ trades }) {
   )
 }
 
-function Heatmap({ monthly }) {
+function Heatmap({ monthly, onCellClick }) {
   const byYear = {}
   monthly.forEach(m => {
     const y = m.month.slice(0, 4), mo = parseInt(m.month.slice(5, 7), 10) - 1
@@ -719,18 +837,30 @@ function Heatmap({ monthly }) {
   })
   const years = Object.keys(byYear).sort()
   return (
-    <div className="hm">
+    <div className="hm" style={{ gridTemplateColumns: '34px repeat(13,minmax(0,1fr))' }}>
       {years.flatMap(y => {
         const cells = [<div key={y + '-yl'} className="yl">{"'" + y.slice(2)}</div>]
         byYear[y].forEach((cell, i) => {
           const moStr = i + 1 < 10 ? '0' + (i + 1) : '' + (i + 1)
+          const monthISO = `${y}-${moStr}`
           const net = cell ? cell.net : null, pctv = cell ? cell.pct : null
-          const tip = cell ? `${fMonSh(y + '-' + moStr + '-01')} ${fL(net)} (${pctv >= 0 ? '+' : ''}${pctv.toFixed(2)}%)` : ''
+          const tip = cell ? `${fMonSh(y + '-' + moStr + '-01')} ${fL(net)} (${formatMonthlyReturn(pctv)})` + (onCellClick ? ' · click for leg breakdown' : '') : ''
+          const clickable = !!cell && !!onCellClick
           cells.push(
-            <div key={y + '-' + i} className={'cell' + (cell ? '' : ' empty')}
-              style={cell ? { background: hmColor(pctv), color: hmText(pctv) } : undefined} title={tip || undefined}>{cellLbl(pctv)}</div>
+            <div key={y + '-' + i} className={'cell' + (cell ? '' : ' empty') + (clickable ? ' clickable' : '')}
+              style={cell ? { background: hmColor(pctv), color: hmText(pctv) } : undefined} data-tooltip={tip || undefined}
+              onClick={clickable ? () => onCellClick({ months: [monthISO], plabel: null, month: monthISO, quarter: false }) : undefined}>{cellLbl(pctv)}</div>
           )
         })
+        const yearMonths = byYear[y].map((c, i) => c ? `${y}-${i + 1 < 10 ? '0' : ''}${i + 1}` : null).filter(Boolean)
+        const yp = compoundYearlyPct(byYear[y].filter(Boolean).map(c => c.pct))
+        const yrClickable = yearMonths.length > 0 && !!onCellClick
+        const fireYear = () => onCellClick({ months: yearMonths, plabel: y, quarter: false })
+        cells.push(
+          <div key={y + '-yr'} className={'cell yr' + (yrClickable ? ' clickable' : '')} style={{ background: hmColor(yp), color: hmText(yp) }}
+            data-tooltip={`${y} (compounded): ${formatMonthlyReturn(yp)}`+ (yrClickable ? ' · click for leg breakdown' : '')}
+            onClick={yrClickable ? fireYear : undefined}>{cellLbl(yp)}</div>
+        )
         return cells
       })}
     </div>
@@ -789,7 +919,7 @@ function EquityCurve({ monthly, allocationCr, deployedCr, backtest, backtestBase
     const ptX = rect.left - wrect.left + dot.x / CURVE_W * rect.width
     const ptY = rect.top - wrect.top + dot.y / CURVE_H * rect.height
     const left = ptX > wrap.clientWidth / 2 ? ptX - 130 : ptX + 14
-    setTip({ idx, gx: dot.x, gy: dot.y, left, top: Math.max(2, ptY - 92), mo: row.month, cum: row.cumulative_inr, net: row.net_inr, backtest: btIdx === null ? null : backtestRows[btIdx]?.value })
+    setTip({ idx, gx: dot.x, gy: dot.y, left, top: Math.max(2, ptY - 92), clientX: e.clientX, clientY: e.clientY, mo: row.month, cum: row.cumulative_inr, net: row.net_inr, backtest: btIdx === null ? null : backtestRows[btIdx]?.value })
   }
 
   if (!monthly?.length) {
@@ -826,16 +956,16 @@ function EquityCurve({ monthly, allocationCr, deployedCr, backtest, backtestBase
           onMouseMove={onMove} onMouseLeave={() => setTip(null)} />
       </svg>
       {tip && (
-        <div className="crv-tip" style={{ opacity: 1, left: tip.left, top: tip.top }}>
+        <FloatingTooltip x={tip.clientX} y={tip.clientY} className="chart-tooltip client-curve-tooltip">
           <div className="tt-mo">{fMonSh(tip.mo)}</div>
           <div className="tt-row"><span>Cumulative</span><b className={tip.cum >= 0 ? 'u' : 'd'}>{fL(tip.cum)}</b></div>
           <div className="tt-row"><span>This month</span><b className={tip.net >= 0 ? 'u' : 'd'}>{fL(tip.net)}</b></div>
           {showBacktest && tip.backtest != null && <div className="tt-row"><span>Spot benchmark</span><b className={tip.backtest >= 0 ? 'u' : 'd'}>{fL(tip.backtest)}</b></div>}
-        </div>
+        </FloatingTooltip>
       )}
       <div className="curve-foot">
         <div className="cf-ticks">{foot.map((f, i) => <span key={i}>{f}</span>)}</div>
-        {backtestRows.length > 0 && <span className="bt-foot" onClick={() => setShowBacktest(v => !v)} title="Click to show/hide the spot benchmark" style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}>Spot benchmark</span>}
+        {backtestRows.length > 0 && <span className="bt-foot" onClick={() => setShowBacktest(v => !v)} data-tooltip="Click to show or hide the spot benchmark" style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}>Spot benchmark</span>}
       </div>
     </div>
   )

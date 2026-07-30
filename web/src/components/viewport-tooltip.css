@@ -1,0 +1,27 @@
+.viewport-tooltip{
+  position:fixed;
+  z-index:2147483000;
+  pointer-events:none;
+  max-width:min(320px,calc(100vw - 20px));
+  padding:7px 9px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:9px;
+  background:#1F1B16;
+  color:#fff;
+  box-shadow:0 18px 42px -16px rgba(31,27,22,.78);
+  font-family:var(--font-ui);
+  font-size:.6875rem;
+  font-weight:700;
+  line-height:1.4;
+  white-space:normal;
+}
+.viewport-tooltip.chart-tooltip{min-width:118px;white-space:nowrap}
+.viewport-tooltip span{display:block;color:#CDBFA9;font-size:.59375rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.viewport-tooltip b{font-family:var(--font-num);font-size:.75rem;font-weight:800}
+.viewport-tooltip em{display:block;margin-top:3px;font-style:normal;font-family:var(--font-num);font-size:.6875rem;color:#FDBA74}
+.viewport-tooltip.client-curve-tooltip{background:#0F1B2D;min-width:150px}
+.viewport-tooltip .tt-mo{font-weight:700;font-size:.75rem;margin-bottom:5px;letter-spacing:.02em}
+.viewport-tooltip .tt-row{display:flex;justify-content:space-between;gap:14px;align-items:center;font-size:.6875rem;line-height:1.7}
+.viewport-tooltip .tt-row span{display:inline;color:#94A3B8;font-size:inherit;text-transform:none;letter-spacing:0;margin:0;font-weight:600}
+.viewport-tooltip .tt-row b{font-size:.6875rem;font-weight:600}
+.viewport-tooltip .tt-row b.u{color:#5EE0A8}.viewport-tooltip .tt-row b.d{color:#FDA47A}

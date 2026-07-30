@@ -1,0 +1,602 @@
+/* Layout 4 — Capital Rail
+   A minimal login and one product diagram: client capital enters, a pair strategy manages the
+   allocation, and the result resolves into account-level P&L. No canvas or continuous animation. */
+
+.login-screen{
+  --login-navy:#0b1f32;
+  --login-night:#071827;
+  --login-blue:#1b3a56;
+  --login-cream:#fbf4ea;
+  --login-paper:#fffdf9;
+  --login-ink:#102a42;
+  --login-line:#ded1bf;
+  --login-orange:#f97316;
+  --login-rust:#c2410c;
+  --login-sky:#38bdf8;
+  --login-sky-deep:#0369a1;
+  position:relative;
+  isolation:isolate;
+  width:100%;
+  min-height:100vh;
+  min-height:100dvh;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) clamp(390px,32vw,500px);
+  overflow:hidden;
+  background:var(--login-night);
+  color:var(--login-ink);
+  font-family:var(--font-ui);
+}
+
+.login-visual{
+  position:relative;
+  min-width:0;
+  min-height:100vh;
+  min-height:100dvh;
+  overflow:hidden;
+  background:var(--login-night);
+}
+
+.login-visual::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  opacity:.7;
+  background-image:
+    linear-gradient(rgba(125,211,252,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(125,211,252,.025) 1px,transparent 1px);
+  background-size:48px 48px;
+  mask-image:linear-gradient(135deg,#000,transparent 78%);
+  -webkit-mask-image:linear-gradient(135deg,#000,transparent 78%);
+}
+
+.login-brand{
+  position:absolute;
+  z-index:3;
+  top:36px;
+  left:42px;
+  width:180px;
+}
+
+.login-brand img{display:block;width:100%;height:auto}
+
+.login-visual-mark{
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:52%;
+  width:min(86%,820px);
+  transform:translate(-50%,-50%);
+}
+
+.login-capital-rail{display:block;width:100%;height:auto;overflow:visible}
+.capital-rail-frame{stroke:rgba(251,244,234,.1);stroke-width:1}
+.capital-rail-labels text,.capital-result-labels text,.capital-leg-key text{font-family:'Courier Prime',monospace}
+.capital-label{fill:rgba(251,244,234,.66);font-size:14px;font-weight:700;letter-spacing:1.7px}
+.capital-label-secondary{fill:rgba(251,244,234,.3);font-size:10px;font-weight:400;letter-spacing:1.2px}
+
+.capital-client-terminals rect{
+  fill:transparent;
+  stroke:rgba(251,244,234,.74);
+  stroke-width:1.5;
+}
+
+.capital-client-lines path,.capital-flow-return,.capital-strategy-mean,.capital-spread-connectors path,.capital-strategy-leg,.capital-leg-key path{
+  fill:none;
+  vector-effect:non-scaling-stroke;
+}
+
+.capital-client-lines path{stroke:rgba(251,244,234,.57);stroke-width:1.6}
+.capital-client-lines .capital-flow-trunk{stroke:var(--login-orange);stroke-width:2.6}
+.capital-strategy-mean{fill:none;stroke:rgba(251,244,234,.17);stroke-width:1;stroke-dasharray:5 9;vector-effect:non-scaling-stroke}
+.capital-spread-connectors path{stroke:rgba(251,244,234,.13);stroke-width:1;stroke-dasharray:3 6}
+.capital-strategy-leg{fill:none;stroke-width:3;vector-effect:non-scaling-stroke}
+.capital-strategy-leg.is-orange,.capital-leg-key .is-orange{stroke:var(--login-orange)}
+.capital-strategy-leg.is-sky,.capital-leg-key .is-sky{stroke:var(--login-sky)}
+
+.capital-strategy-gates path{
+  fill:var(--login-night);
+  stroke:rgba(251,244,234,.82);
+  stroke-width:1.5;
+  vector-effect:non-scaling-stroke;
+}
+
+.capital-leg-key path{stroke-width:2}
+.capital-leg-key text{fill:rgba(251,244,234,.42);font-size:9px;letter-spacing:1px}
+.capital-flow-return{stroke:#f7ead9;stroke-width:2.7}
+.capital-return-end{fill:var(--login-orange)}
+.capital-result-rays{
+  fill:none;
+  stroke:var(--login-orange);
+  stroke-width:1.4;
+  vector-effect:non-scaling-stroke;
+  opacity:0;
+}
+.login-mobile-flow-key{display:none}
+
+.login-panel{
+  position:relative;
+  min-width:0;
+  min-height:100vh;
+  min-height:100dvh;
+  padding:34px 42px 27px;
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+  background:linear-gradient(145deg,var(--login-paper),var(--login-cream) 78%);
+}
+
+.login-seam{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:3px;
+  display:flex;
+  flex-direction:column;
+}
+.login-seam span,.login-seam i{display:block;width:100%;height:50%;transition:background .18s}
+.login-seam span{background:var(--login-sky)}
+.login-seam i{background:var(--login-orange)}
+.login-screen.has-error .login-seam span,.login-screen.has-error .login-seam i{background:var(--login-orange)}
+
+.login-panel-meta{
+  flex:0 0 auto;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:11px;
+  color:rgba(16,42,66,.48);
+  font-family:'Courier Prime',monospace;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.11em;
+}
+
+.login-panel-meta b{
+  width:27px;
+  height:23px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(16,42,66,.2);
+  color:var(--login-rust);
+  font-size:9px;
+}
+
+.login-form{
+  flex:0 0 auto;
+  align-self:center;
+  width:min(340px,100%);
+  margin:auto;
+  padding:48px 0 54px;
+}
+
+.login-product-name{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--login-rust);
+  font-family:'Courier Prime',monospace;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.14em;
+}
+
+.login-product-name i{
+  width:8px;
+  height:8px;
+  border:2px solid var(--login-orange);
+  transform:rotate(45deg);
+}
+
+.login-form h1{
+  margin:10px 0 35px;
+  color:var(--login-navy);
+  font-family:'Familjen Grotesk',var(--font-ui);
+  font-size:42px;
+  line-height:1;
+  font-weight:650;
+  letter-spacing:-.045em;
+}
+
+.login-form-field{margin-top:20px}
+.login-form-field label{
+  display:block;
+  margin-bottom:8px;
+  color:var(--login-ink);
+  font-size:11px;
+  line-height:1;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.09em;
+}
+
+.login-control{position:relative}
+.login-control input{
+  width:100%;
+  height:56px;
+  padding:0 46px;
+  border:1px solid var(--login-line);
+  border-radius:2px;
+  outline:0;
+  background:rgba(255,255,255,.7);
+  color:var(--login-navy);
+  font-family:var(--font-ui);
+  font-size:14px;
+  font-weight:700;
+  caret-color:var(--login-orange);
+  transition:border-color .18s,box-shadow .18s,background .18s;
+}
+
+.login-control input::placeholder{color:#9b8c78;font-weight:600}
+.login-control input:hover:not(:disabled){border-color:#b8a68e;background:#fff}
+.login-control input:focus{border-color:var(--login-sky-deep);background:#fff;box-shadow:0 0 0 3px rgba(56,189,248,.16),inset 3px 0 var(--login-sky)}
+.login-control input:disabled{cursor:wait;opacity:.66}
+.login-control.has-error input{border-color:var(--login-rust);box-shadow:inset 3px 0 var(--login-orange),0 0 0 3px rgba(249,115,22,.08)}
+
+.login-control-icon{
+  position:absolute;
+  z-index:2;
+  left:15px;
+  top:50%;
+  width:18px;
+  height:18px;
+  transform:translateY(-50%);
+  color:#53728a;
+  pointer-events:none;
+}
+
+.login-control-icon svg,.login-password-toggle svg{
+  display:block;
+  width:100%;
+  height:100%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.65;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.login-control:focus-within .login-control-icon{color:var(--login-sky-deep)}
+.login-password-toggle{
+  position:absolute;
+  z-index:3;
+  right:9px;
+  top:50%;
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  transform:translateY(-50%);
+  border:0;
+  border-radius:2px;
+  background:transparent;
+  color:#53728a;
+  cursor:pointer;
+}
+.login-password-toggle:hover:not(:disabled){background:#edf5f8;color:var(--login-sky-deep)}
+.login-password-toggle:disabled{cursor:wait;opacity:.55}
+.login-password-toggle svg{width:18px;height:18px}
+
+.login-eye-strike{
+  position:absolute;
+  width:21px;
+  height:1.5px;
+  background:currentColor;
+  transform:rotate(-43deg) scaleX(0);
+  transition:transform .18s ease;
+}
+.login-eye-strike.is-visible{transform:rotate(-43deg) scaleX(1)}
+
+.login-submit{
+  position:relative;
+  width:100%;
+  height:56px;
+  margin-top:25px;
+  padding:0 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  overflow:hidden;
+  border:0;
+  border-radius:2px;
+  background:var(--login-navy);
+  color:#fffaf3;
+  font-family:var(--font-ui);
+  font-size:12px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.075em;
+  cursor:pointer;
+  transition:transform .18s,background .18s;
+}
+
+.login-submit::after{
+  content:"";
+  position:absolute;
+  z-index:1;
+  left:0;
+  right:0;
+  bottom:0;
+  height:3px;
+  background:var(--login-orange);
+  transition:height .24s,opacity .24s;
+}
+.login-submit > span,.login-submit svg{position:relative;z-index:2}
+.login-submit svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.login-submit:hover:not(:disabled){transform:translateY(-1px);background:#102d47}
+.login-submit:hover:not(:disabled)::after{height:100%;opacity:.14}
+.login-submit:active:not(:disabled){transform:none}
+.login-submit:disabled{cursor:wait;opacity:.72}
+
+.login-feedback{
+  min-height:37px;
+  padding-top:11px;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  color:rgba(11,31,50,.56);
+  font-size:11px;
+  line-height:1.4;
+  font-weight:700;
+}
+.login-feedback > i{width:7px;height:7px;margin-top:4px;border-radius:50%;background:var(--login-sky-deep);box-shadow:0 0 0 4px rgba(56,189,248,.12)}
+.login-feedback.has-message{color:var(--login-rust)}
+.login-feedback > span{
+  flex:0 0 auto;
+  width:18px;
+  height:18px;
+  margin-top:-2px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(194,65,12,.42);
+  font-family:'Courier Prime',monospace;
+  font-size:10px;
+}
+
+.login-status{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.login-panel-footer{
+  flex:0 0 auto;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+  color:rgba(16,42,66,.42);
+  font-family:'Courier Prime',monospace;
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.09em;
+}
+.login-panel-footer i{width:18px;height:1px;background:linear-gradient(90deg,var(--login-orange),var(--login-sky))}
+
+.login-password-toggle:focus-visible,.login-submit:focus-visible{
+  outline:3px solid var(--login-sky);
+  outline-offset:3px;
+}
+
+@media (prefers-reduced-motion:no-preference){
+  .login-brand{animation:login-fade-in .48s ease-out both}
+  .login-panel-meta{animation:login-fade-in .42s .08s ease-out both}
+  .login-form{animation:login-form-in .52s .08s cubic-bezier(.2,.8,.2,1) both}
+  .login-panel-footer{animation:login-fade-in .42s .22s ease-out both}
+  .capital-client-terminals,.capital-rail-frame{animation:login-fade-in .42s .12s ease-out both}
+  .capital-label,.capital-leg-key{animation:login-fade-in .35s .56s ease-out both}
+  .capital-strategy-gates,.capital-return-end{animation:login-fade-in .28s .76s ease-out both}
+  .capital-flow-draw{stroke-dasharray:1;stroke-dashoffset:1;animation:login-trace .68s cubic-bezier(.2,.8,.2,1) forwards}
+  .capital-flow-in{animation-delay:.14s}
+  .capital-flow-trunk{animation-delay:.31s}
+  .capital-strategy-leg{animation-delay:.38s;animation-duration:.78s}
+  .capital-flow-return{animation-delay:.73s;animation-duration:.48s}
+}
+
+@keyframes login-trace{to{stroke-dashoffset:0}}
+@keyframes login-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes login-form-in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+/* Successful authentication — the product diagram does the work, resolves to one result, and
+   hands its exact P&L endpoint to the document-level ledger transition. Every motion is finite. */
+.login-screen.is-resolving{pointer-events:none}
+.capital-strategy-leg,.capital-spread-connectors{
+  transform-box:fill-box;
+  transform-origin:center;
+}
+
+@media (prefers-reduced-motion:no-preference){
+  .login-screen.is-resolving .login-form,
+  .login-screen.is-resolving .login-panel-meta,
+  .login-screen.is-resolving .login-panel-footer{
+    animation:login-interface-resolve .42s .5s ease-in both;
+  }
+  .login-screen.is-resolving .login-brand{
+    animation:login-interface-resolve .34s .58s ease-in both;
+  }
+
+  .login-screen.is-resolving .capital-client-terminals rect{
+    animation:login-capital-commit .2s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .login-screen.is-resolving .capital-client-terminals rect:nth-child(2){animation-delay:.045s}
+  .login-screen.is-resolving .capital-client-terminals rect:nth-child(3){animation-delay:.09s}
+  .login-screen.is-resolving .capital-client-terminals rect:nth-child(4){animation-delay:.135s}
+
+  .login-screen.is-resolving .capital-flow-in{
+    stroke-dasharray:1;
+    stroke-dashoffset:1;
+    animation:login-work-trace .32s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .login-screen.is-resolving .capital-flow-in:nth-child(2){animation-delay:.04s}
+  .login-screen.is-resolving .capital-flow-in:nth-child(3){animation-delay:.08s}
+  .login-screen.is-resolving .capital-flow-in:nth-child(4){animation-delay:.12s}
+  .login-screen.is-resolving .capital-flow-trunk{
+    stroke-dasharray:1;
+    stroke-dashoffset:1;
+    animation:login-work-trace .2s .18s ease-out both;
+  }
+
+  .login-screen.is-resolving .capital-strategy-leg{
+    stroke-dasharray:1;
+    stroke-dashoffset:1;
+    animation:
+      login-work-trace .4s .22s cubic-bezier(.2,.8,.2,1) both,
+      login-pair-resolve .25s .58s cubic-bezier(.65,0,.35,1) both;
+  }
+  .login-screen.is-resolving .capital-spread-connectors{
+    animation:login-pair-resolve .25s .58s cubic-bezier(.65,0,.35,1) both;
+  }
+  .login-screen.is-resolving .capital-spread-connectors path{
+    animation:login-rung-work .2s ease-out both;
+  }
+  .login-screen.is-resolving .capital-spread-connectors path:nth-child(1){animation-delay:.29s}
+  .login-screen.is-resolving .capital-spread-connectors path:nth-child(2){animation-delay:.34s}
+  .login-screen.is-resolving .capital-spread-connectors path:nth-child(3){animation-delay:.39s}
+  .login-screen.is-resolving .capital-spread-connectors path:nth-child(4){animation-delay:.44s}
+  .login-screen.is-resolving .capital-spread-connectors path:nth-child(5){animation-delay:.49s}
+  .login-screen.is-resolving .capital-strategy-mean{
+    animation:login-mean-resolve .34s .52s ease-out both;
+  }
+  .login-screen.is-resolving .capital-result-labels .capital-label-primary{
+    animation:login-result-label .3s .7s ease-out both;
+  }
+
+  .login-screen.is-resolving .capital-rail-frame,
+  .login-screen.is-resolving .capital-rail-labels,
+  .login-screen.is-resolving .capital-client-lines,
+  .login-screen.is-resolving .capital-client-terminals,
+  .login-screen.is-resolving .capital-strategy-gates,
+  .login-screen.is-resolving .capital-leg-key{
+    animation:login-work-clear .28s .62s ease-in both;
+  }
+
+  .login-screen.is-resolving .capital-flow-return{
+    stroke-dasharray:1;
+    stroke-dashoffset:1;
+    animation:login-work-trace .3s .66s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .login-screen.is-resolving .capital-return-end{
+    transform-box:fill-box;
+    transform-origin:center;
+    animation:login-result-seal .24s .79s cubic-bezier(.2,.9,.25,1) both;
+  }
+  .login-screen.is-resolving .capital-result-rays{
+    transform-box:fill-box;
+    transform-origin:center;
+    animation:login-result-rays .19s .84s ease-out both;
+  }
+}
+
+@keyframes login-capital-commit{
+  from{fill:transparent;stroke:rgba(251,244,234,.74)}
+  to{fill:var(--login-orange);stroke:var(--login-orange)}
+}
+@keyframes login-work-trace{to{stroke-dashoffset:0}}
+@keyframes login-rung-work{
+  from{opacity:.08;stroke:rgba(251,244,234,.12)}
+  55%{opacity:.85;stroke:var(--login-sky)}
+  to{opacity:.35;stroke:rgba(251,244,234,.28)}
+}
+@keyframes login-pair-resolve{
+  from{transform:scaleY(1);opacity:1}
+  to{transform:scaleY(.025);opacity:.14}
+}
+@keyframes login-mean-resolve{
+  from{opacity:.17;stroke-width:1}
+  to{opacity:1;stroke:#f7ead9;stroke-width:2.4;stroke-dasharray:none}
+}
+@keyframes login-work-clear{to{opacity:.075}}
+@keyframes login-result-seal{
+  0%{transform:rotate(0) scale(.75);fill:var(--login-orange)}
+  62%{transform:rotate(45deg) scale(1.55);fill:#fff8ee}
+  100%{transform:rotate(45deg) scale(1.12);fill:var(--login-orange)}
+}
+@keyframes login-result-rays{
+  0%{opacity:0;transform:scale(.25)}
+  45%{opacity:1}
+  100%{opacity:0;transform:scale(1.35)}
+}
+@keyframes login-result-label{to{fill:#f7ead9}}
+@keyframes login-interface-resolve{
+  to{opacity:.14;transform:translateY(-4px)}
+}
+
+@media (max-height:660px) and (min-width:901px){
+  .login-brand{top:24px;left:32px;width:158px}
+  .login-panel{padding:22px 34px 20px}
+  .login-form{padding:25px 0 28px}
+  .login-form h1{margin-bottom:24px;font-size:36px}
+  .login-form-field{margin-top:15px}
+  .login-control input{height:51px}
+  .login-submit{height:51px;margin-top:18px}
+  .login-feedback{min-height:31px;padding-top:8px}
+}
+
+@media (max-width:900px){
+  .login-screen{
+    min-height:100dvh;
+    height:auto;
+    grid-template-columns:1fr;
+    grid-template-rows:clamp(220px,29dvh,280px) auto;
+    overflow-x:hidden;
+    overflow-y:auto;
+    background:var(--login-cream);
+  }
+  .login-visual{min-height:0;height:100%}
+  .login-visual::before{background-size:34px 34px}
+  .login-brand{top:17px;left:19px;width:142px}
+  .login-visual-mark{top:59%;width:min(92%,680px)}
+  .capital-rail-labels,.capital-result-labels,.capital-leg-key{display:none}
+  .capital-rail-frame{stroke:rgba(251,244,234,.08)}
+  .login-mobile-flow-key{
+    position:absolute;
+    left:2%;
+    right:2%;
+    bottom:1px;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    color:rgba(251,244,234,.55);
+    font-family:'Courier Prime',monospace;
+    font-size:8px;
+    text-transform:uppercase;
+    letter-spacing:.045em;
+  }
+  .login-mobile-flow-key i{height:1px;flex:1;background:rgba(251,244,234,.18)}
+  .login-panel{
+    min-height:calc(100dvh - clamp(220px,29dvh,280px));
+    padding:24px 22px max(20px,env(safe-area-inset-bottom));
+    overflow:visible;
+  }
+  .login-seam{left:0;right:0;top:0;bottom:auto;width:100%;height:3px;flex-direction:row}
+  .login-seam span,.login-seam i{width:50%;height:100%}
+  .login-panel-meta{font-size:9px}
+  .login-form{padding:29px 0 35px}
+  .login-form h1{margin:9px 0 28px;font-size:36px}
+  .login-control input{font-size:16px}
+  .login-panel-footer{font-size:8px}
+}
+
+@media (max-width:420px){
+  .login-panel{padding-left:19px;padding-right:19px}
+  .login-form{width:100%}
+  .login-brand{left:16px;width:136px}
+  .login-mobile-flow-key{left:1%;right:1%;font-size:7px;gap:5px}
+}
+
+@media (max-height:600px) and (max-width:900px){
+  .login-screen{grid-template-rows:180px auto}
+  .login-brand{top:12px;width:118px}
+  .login-visual-mark{top:61%;width:min(76%,580px)}
+  .login-mobile-flow-key{display:none}
+  .login-panel{min-height:calc(100dvh - 180px)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .login-screen *,
+  .login-screen *::before,
+  .login-screen *::after{
+    animation-duration:.001ms !important;
+    animation-delay:0s !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+  .capital-flow-draw{stroke-dasharray:none !important;stroke-dashoffset:0 !important}
+}

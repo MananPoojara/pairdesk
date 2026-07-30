@@ -1,7 +1,7 @@
 // AUTO-GENERATED from Reference sheets (verified). Hardcoded variant showcase data.
 // Options: Master Club 4.1 (5-strategy combined) WOW-MOM — additive, +263% (2019–2026).
 // BankNifty: 'Copy of MidCap + Nifty Pair Trading_Updated.xlsx' sheet 'P&L 30 Cr_BNF' —
-//   Midcap×Nifty futures pair (BankNifty-enhanced), 30 Cr scale; net ₹14.71 Cr / +49% (2024–2026).
+//   Midcap×Nifty futures pair (BankNifty-enhanced), 30 Cr scale; net 14.71 Cr / +49% (2024–2026).
 export const VARIANTS = {
   "options": {
     "summary": {
@@ -398,7 +398,7 @@ export const VARIANTS = {
   "banknifty": {
     "summary": {
       "name": "Pair Trading \u2014 BankNifty",
-      "subtitle": "Apr 2024 \u2013 Jun 2026",
+      "subtitle": "May 2024 \u2013 Jul 2026",
       "active": false,
       "net_inr": 176951610,
       "net_cr": 17.7,
@@ -418,11 +418,11 @@ export const VARIANTS = {
       "aum_cr": 30,
       "base_aum_cr": 30,
       "exposure_cr": 30,
-      "since": "Apr 2024"
+      "since": "May 2024"
     },
     "monthly": [
       {
-        "month": "2024-04-01",
+        "month": "2024-05-01",
         "trades": 2,
         "gross_inr": 22869129,
         "charges_inr": 0,
@@ -435,7 +435,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-05-01",
+        "month": "2024-06-01",
         "trades": 2,
         "gross_inr": 5848558,
         "charges_inr": 0,
@@ -448,7 +448,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-06-01",
+        "month": "2024-07-01",
         "trades": 2,
         "gross_inr": -186509,
         "charges_inr": 0,
@@ -461,7 +461,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-07-01",
+        "month": "2024-08-01",
         "trades": 2,
         "gross_inr": 7117992,
         "charges_inr": 0,
@@ -474,7 +474,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-08-01",
+        "month": "2024-09-01",
         "trades": 2,
         "gross_inr": -8612317,
         "charges_inr": 0,
@@ -487,7 +487,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-09-01",
+        "month": "2024-10-01",
         "trades": 2,
         "gross_inr": 1833982,
         "charges_inr": 0,
@@ -500,7 +500,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-10-01",
+        "month": "2024-11-01",
         "trades": 2,
         "gross_inr": 9658179,
         "charges_inr": 0,
@@ -513,7 +513,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-11-01",
+        "month": "2024-12-01",
         "trades": 2,
         "gross_inr": 13757756,
         "charges_inr": 0,
@@ -526,7 +526,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2024-12-01",
+        "month": "2025-01-01",
         "trades": 2,
         "gross_inr": 31951014,
         "charges_inr": 0,
@@ -539,7 +539,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-01-01",
+        "month": "2025-02-01",
         "trades": 2,
         "gross_inr": 9424484,
         "charges_inr": 0,
@@ -552,7 +552,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-02-01",
+        "month": "2025-03-01",
         "trades": 2,
         "gross_inr": 6431928,
         "charges_inr": 0,
@@ -565,7 +565,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-03-01",
+        "month": "2025-04-01",
         "trades": 2,
         "gross_inr": 10025488,
         "charges_inr": 0,
@@ -578,7 +578,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-04-01",
+        "month": "2025-05-01",
         "trades": 2,
         "gross_inr": 5586718,
         "charges_inr": 0,
@@ -591,7 +591,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-05-01",
+        "month": "2025-06-01",
         "trades": 2,
         "gross_inr": 5720972,
         "charges_inr": 0,
@@ -604,7 +604,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-06-01",
+        "month": "2025-07-01",
         "trades": 2,
         "gross_inr": -3066033,
         "charges_inr": 0,
@@ -617,7 +617,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-07-01",
+        "month": "2025-08-01",
         "trades": 2,
         "gross_inr": -5561602,
         "charges_inr": 0,
@@ -630,7 +630,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-08-01",
+        "month": "2025-09-01",
         "trades": 2,
         "gross_inr": 581684,
         "charges_inr": 0,
@@ -643,7 +643,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-09-01",
+        "month": "2025-10-01",
         "trades": 2,
         "gross_inr": 3530035,
         "charges_inr": 0,
@@ -656,7 +656,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-10-01",
+        "month": "2025-11-01",
         "trades": 2,
         "gross_inr": 12544577,
         "charges_inr": 0,
@@ -669,7 +669,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-11-01",
+        "month": "2025-12-01",
         "trades": 2,
         "gross_inr": -6784796,
         "charges_inr": 0,
@@ -682,7 +682,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2025-12-01",
+        "month": "2026-01-01",
         "trades": 2,
         "gross_inr": -2621747,
         "charges_inr": 0,
@@ -695,7 +695,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2026-01-01",
+        "month": "2026-02-01",
         "trades": 2,
         "gross_inr": 6061392,
         "charges_inr": 0,
@@ -708,7 +708,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2026-02-01",
+        "month": "2026-03-01",
         "trades": 2,
         "gross_inr": 6784366,
         "charges_inr": 0,
@@ -721,7 +721,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2026-03-01",
+        "month": "2026-04-01",
         "trades": 2,
         "gross_inr": 28432482,
         "charges_inr": 0,
@@ -734,7 +734,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2026-04-01",
+        "month": "2026-05-01",
         "trades": 2,
         "gross_inr": 19572338,
         "charges_inr": 0,
@@ -747,7 +747,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2026-05-01",
+        "month": "2026-06-01",
         "trades": 2,
         "gross_inr": -8457245,
         "charges_inr": 0,
@@ -760,7 +760,7 @@ export const VARIANTS = {
         "nifty_pct": 0
       },
       {
-        "month": "2026-06-01",
+        "month": "2026-07-01",
         "trades": 2,
         "gross_inr": 4508785,
         "charges_inr": 0,

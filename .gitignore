@@ -24,3 +24,15 @@ server/*.txt
 *.log
 server/src/data/tickers.json
 server/src/data/fut_tokens.json
+
+# session/agent junk & experimental variants — not part of the deploy
+web-j/
+.playwright-mcp/
+.agents/
+.claude/
+.codex/
+DATA OF OHLC - Copy.xlsx
+dash-full.png
+DEPLOY.md.save
+FONT_TRIALS.txt
+skills-lock.json

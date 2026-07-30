@@ -3,8 +3,9 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { query } from '../db/pg.js'
 import { duckQuery, PARQUET } from '../db/duck.js'
-import { pairReferenceStats, spotBacktest, SPOT_BACKTEST_BASE_AUM_CR } from '../data/spotBacktest.js'
+import { pairReferenceStats, spotBacktest, spotOpenCycle, SPOT_BACKTEST_BASE_AUM_CR } from '../data/spotBacktest.js'
 import { getLiveMarket, readSnapshot } from '../data/liveMarket.js'
+import { openCycleMonth, applyOpenCycleToMonthly } from '../data/openCycle.js'
 
 // Live index quotes (NIFTY 50 / MIDCAP SELECT / NIFTY BANK) come from data/liveMarket.js — the
 // backend fetches Angel One in-process (60s cache, disk-backed fallback) and marks the open pair
@@ -100,6 +101,25 @@ export async function dashboardHandler(req, reply) {
     FROM m
   `)
 
+  // Open cycle (most-recent-expiry pair): mark it LIVE everywhere. Its Excel exit is a projected
+  // close; while the position is held we override the open month in `monthly` with the live MTM
+  // (entry-side charges only), so all stats below (total, MoM, yearly, Sharpe, equity) follow it.
+  const { rows: latestExpiry } = await query(`SELECT MAX(expiry)::text AS expiry FROM trades`)
+  const maxExpiry = latestExpiry[0].expiry
+  const { rows: positions } = await query(`
+    SELECT
+      c.name AS client_name, c.code AS client_code,
+      t.underlying, t.contract, t.expiry::text,
+      t.direction, t.lots, t.lot_size,
+      t.entry_price::float AS entry_price,
+      t.exit_price::float  AS exit_price
+    FROM trades t
+    JOIN clients c ON c.id = t.client_id
+    WHERE t.expiry = $1
+    ORDER BY c.aum_paise DESC, t.underlying
+  `, [maxExpiry])
+  applyOpenCycleToMonthly(monthly, maxExpiry.slice(0, 8) + '01', openCycleMonth(positions, u => liveLtp[u]))
+
   // 2. Charge totals (lifetime)
   const { rows: chargeTot } = await query(`
     SELECT
@@ -126,36 +146,23 @@ export async function dashboardHandler(req, reply) {
 
   // 4. Client breakdown
   const { rows: clients } = await query(`
-    SELECT code, name, category,
+    SELECT c.code, c.name, c.category, c.exec_type,
            ROUND(aum_paise/1e9::numeric,2) AS aum_cr,
-           ROUND(aum_paise*100.0/(SELECT SUM(aum_paise) FROM clients WHERE is_active),1) AS pct
-    FROM clients
-    WHERE is_active = TRUE
+           ROUND(aum_paise*100.0/(SELECT SUM(aum_paise) FROM clients WHERE is_active),1) AS pct,
+           ROUND(COALESCE((
+             SELECT SUM(COALESCE(NULLIF(cs.exposure_paise, 0), cs.allocation_paise))
+             FROM client_strategies cs WHERE cs.client_id=c.id AND cs.is_active=TRUE
+           ), c.aum_paise) / 1e9::numeric, 2) AS exposure_cr,
+           ROUND(COALESCE((
+             SELECT cs.leverage FROM client_strategies cs
+             WHERE cs.client_id=c.id AND cs.is_active=TRUE ORDER BY cs.id LIMIT 1
+           ), 1), 2) AS leverage
+    FROM clients c
+    WHERE c.is_active = TRUE
     ORDER BY aum_paise DESC
   `)
 
-  // 5. Positions — most recent expiry (= currently open pair)
-  const { rows: latestExpiry } = await query(`
-    SELECT MAX(expiry)::text AS expiry FROM trades
-  `)
-  const maxExpiry = latestExpiry[0].expiry
-
-  const { rows: positions } = await query(`
-    SELECT
-      c.name AS client_name, c.code AS client_code,
-      t.underlying, t.contract, t.expiry::text,
-      t.direction, t.lots, t.lot_size,
-      t.entry_price::float AS entry_price,
-      t.exit_price::float  AS exit_price,
-      CASE WHEN t.direction='LONG'
-           THEN (t.exit_price - t.entry_price) * t.lots * t.lot_size
-           ELSE (t.entry_price - t.exit_price) * t.lots * t.lot_size
-      END AS pnl_inr
-    FROM trades t
-    JOIN clients c ON c.id = t.client_id
-    WHERE t.expiry = $1
-    ORDER BY c.aum_paise DESC, t.underlying
-  `, [maxExpiry])
+  // 5. Positions (open pair) + maxExpiry were fetched above (used for the live open-cycle override).
 
   // 6. LTP + latest_date from DuckDB
   // Use fut_continuous (goes to 2026-06-18) for the most recent prices.
@@ -270,6 +277,19 @@ export async function dashboardHandler(req, reply) {
     exch_gst:  +(((+ch.exch)+(+ch.gst))   / chTotal * 100).toFixed(1),
   }
 
+  // Spot backtest: append the OPEN cycle (blank exit in the sheet) marked to the LIVE SPOT LTP
+  // (NIFTY MIDCAP SELECT / NIFTY 50), entry-side charges only — same treatment as the fut open cycle.
+  // Falls back to the entry price (0 P&L) when live spot is unavailable.
+  const spotLtp = { MIDCPNIFTY: live?.midcap?.spot?.ltp, NIFTY: live?.nifty?.spot?.ltp }
+  const spotEntry = Object.fromEntries(spotOpenCycle.legs.map(l => [l.underlying, l.entry_price]))
+  const spotOpen = openCycleMonth(spotOpenCycle.legs, u => spotLtp[u] ?? spotEntry[u])
+  const spotSeries = [...spotBacktest, {
+    date: spotOpenCycle.month,
+    net_inr: Math.round(spotOpen.net_inr),
+    midcap_net_inr: Math.round(spotOpen.midcap_net_inr),
+    nifty_net_inr: Math.round(spotOpen.nifty_net_inr),
+  }]
+
   return {
     hero: {
       overall: {
@@ -333,7 +353,7 @@ export async function dashboardHandler(req, reply) {
       source: 'Data/SpotData',
       basis: 'spot',
       base_aum_cr: SPOT_BACKTEST_BASE_AUM_CR,
-      series: spotBacktest,
+      series: spotSeries,
     },
     charges: {
       total_inr:  Math.round(+ch.total),
@@ -346,11 +366,14 @@ export async function dashboardHandler(req, reply) {
       pie:        chargePie,
     },
     clients: clients.map(c => ({
-      name:     c.name,
-      code:     c.code,
-      category: c.category,
-      aum_cr:   +c.aum_cr,
-      pct:      +c.pct,
+      name:      c.name,
+      code:      c.code,
+      category:  c.category,
+      exec_type: c.exec_type || 'F2F',   // F2F = fut×fut · F2O = fut×option (drives the Fut/Options card filter)
+      aum_cr:    +c.aum_cr,
+      exposure_cr: +c.exposure_cr,
+      leverage:  +c.leverage,
+      pct:       +c.pct,
     })),
     positions: enrichedPos,
     rollover: {

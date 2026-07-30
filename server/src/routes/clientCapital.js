@@ -104,15 +104,26 @@ export async function updateClientCapitalHandler(req, reply) {
 
     const dbClient = updated.rows[0]
 
+    // Is this client on the capital timeline? If so, a capital change must be journalled as a
+    // pay-in/pay-out delta (dated today) so the ledger stays the source of truth — never a silent
+    // overwrite. Clients with no events yet (e.g. just created in the UI) keep the direct set.
+    const { rows: evAgg } = await client.query(`
+      SELECT COALESCE(SUM(CASE WHEN type='PAY_IN' THEN amount_paise ELSE -amount_paise END), 0)::bigint AS bal,
+             COUNT(*)::int AS n
+      FROM capital_events WHERE client_id = $1
+    `, [dbClient.id])
+    const evBalance = Number(evAgg[0].bal)
+    const hasEvents = evAgg[0].n > 0
+
     const strategyRows = input.strategyCode
       ? await client.query(`
-          SELECT cs.id, s.code
+          SELECT cs.id, cs.strategy_id, s.code
           FROM client_strategies cs
           JOIN strategies s ON s.id = cs.strategy_id
           WHERE cs.client_id = $1 AND cs.is_active = TRUE AND UPPER(s.code) = $2
         `, [dbClient.id, input.strategyCode])
       : await client.query(`
-          SELECT cs.id, s.code
+          SELECT cs.id, cs.strategy_id, s.code
           FROM client_strategies cs
           JOIN strategies s ON s.id = cs.strategy_id
           WHERE cs.client_id = $1 AND cs.is_active = TRUE
@@ -129,6 +140,17 @@ export async function updateClientCapitalHandler(req, reply) {
             leverage = $3
         WHERE id = $4
       `, [input.allocationPaise, input.exposurePaise, input.leverage, strategy.id])
+
+      // Journal the allocation change (what the timeline tracks) as a delta pay-in/pay-out so the
+      // ledger balance stays = allocation. Only for timeline clients and only if it actually changed.
+      if (hasEvents && input.allocationPaise !== evBalance) {
+        const diff = input.allocationPaise - evBalance
+        const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)   // IST date
+        await client.query(`
+          INSERT INTO capital_events (client_id, strategy_id, effective_date, type, amount_paise, ref)
+          VALUES ($1, $2, $3, $4, $5, 'capital adjustment')
+        `, [dbClient.id, strategy.strategy_id, today, diff > 0 ? 'PAY_IN' : 'PAY_OUT', Math.abs(diff)])
+      }
       allocationUpdated = {
         strategy_code: strategy.code,
         allocation_cr: input.allocationCr,

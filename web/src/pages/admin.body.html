@@ -4,9 +4,7 @@
   <div class="pagehd">
     <div>
       <div class="title">Admin</div>
-      <div class="crumb">Platform settings · charges · users · data</div>
     </div>
-    <div class="controls"><div class="gl">⌕ Search settings</div></div>
   </div>
 
   <!-- 2 · Risk & sizing defaults -->
@@ -27,29 +25,11 @@
           <input value="3.00×">
         </div>
       </div>
-      <div class="inote">These are platform defaults; each strategy can override (global default + per-strategy override).</div>
     </div>
     <div class="savebar"><button class="btn">Save defaults</button></div>
   </div>
 
   <!-- 3 · Charge / tax configuration -->
-  <div class="panel">
-    <div class="pth"><b>Charge / tax configuration</b><span class="pill">as-of Apr 2026</span></div>
-    <div class="tscroll">
-      <table>
-        <thead><tr><th>Charge</th><th>Rate</th><th>Applies to</th><th>Notes</th><th></th></tr></thead>
-        <tbody>
-          <tr><td><b>STT</b></td><td class="m">0.05%</td><td>Sell-side</td><td>Futures</td><td><span class="ed">✎</span></td></tr>
-          <tr><td><b>Exchange txn charge</b></td><td class="m">₹1.73 / lakh</td><td>Both sides</td><td>NSE F&amp;O turnover</td><td><span class="ed">✎</span></td></tr>
-          <tr><td><b>SEBI turnover fee</b></td><td class="m">0.0001% +18% GST</td><td>Both sides</td><td>On turnover</td><td><span class="ed">✎</span></td></tr>
-          <tr><td><b>Stamp duty</b></td><td class="m">0.002%</td><td>Buy-side</td><td>State levy</td><td><span class="ed">✎</span></td></tr>
-          <tr><td><b>GST</b></td><td class="m">18%</td><td>On brokerage + exch + SEBI</td><td>Service tax</td><td><span class="ed">✎</span></td></tr>
-          <tr><td><b>Brokerage</b></td><td class="m">Per broker</td><td>Both sides</td><td>See below</td><td><span class="ed">✎</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="warn"><span>⚠</span><span>Rates change with SEBI/exchange circulars &amp; budgets — verify against the NSE / Angel One charge sheet before figures are final.</span></div>
-  </div>
 
   <!-- 4 · Brokerage by broker -->
   <div class="panel">
@@ -97,18 +77,6 @@
     </div>
   </div>
 
-  <!-- 7 · Feature toggles -->
-  <div class="panel">
-    <div class="pth"><b>Feature toggles</b><span class="pill">Showcase env</span></div>
-    <div class="pbody">
-      <div class="grid2" style="margin-bottom:0">
-        <div class="tgrow"><div><div class="tl">Dark mode</div><div class="ts">UI theme across all modules</div></div><div class="toggle"></div></div>
-        <div class="tgrow"><div><div class="tl">Live execution</div><div class="ts">Route real orders to broker</div></div><div class="toggle"></div></div>
-        <div class="tgrow"><div><div class="tl">Synthetic-Future product</div><div class="ts">Enable synthetic pair instrument</div></div><div class="toggle"></div></div>
-        <div class="tgrow"><div><div class="tl">Email reports</div><div class="ts">Daily PnL &amp; ops digest</div></div><div class="toggle on"></div></div>
-      </div>
-    </div>
-  </div>
 
 </div>
 

@@ -5,13 +5,15 @@ import { apiGet } from '../api/client'
 import { fmtNum } from '../lib/format'
 
 function Ticker({ name, t, fallback }) {
-  const ltp = t?.ltp ?? fallback?.ltp
-  const chg = t?.change ?? fallback?.points
+  const s = t?.spot ?? t                 // prefer NSE spot; fall back to futures fields if spot missing
+  const ltp = s?.ltp ?? fallback?.ltp
+  const chg = s?.change ?? fallback?.points
+  const pct = s?.pct
   if (ltp == null) return <div className="ti"><span className="n">{name}</span><span className="v">—</span></div>
   const up = (chg ?? 0) >= 0
   return (
     <div className="ti"><span className="n">{name}</span><span className="v">{fmtNum(ltp)}</span>
-      {chg != null && <span className={'c ' + (up ? 'u' : 'd')}>{(up ? '▲' : '▼') + Math.abs(chg).toFixed(2)}</span>}</div>
+      {chg != null && <span className={'c ' + (up ? 'u' : 'd')}>{(up ? '▲' : '▼') + Math.abs(chg).toFixed(2)}{pct != null && ` (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`}</span>}</div>
   )
 }
 
@@ -29,9 +31,9 @@ export default function MarketTickers({ dash }) {
   const midPos = dash?.positions?.find(p => p.underlying === 'MIDCPNIFTY')
   return (
     <>
-      <Ticker name="NIFTY FUT" t={t.nifty} fallback={niftyPos} />
-      <Ticker name="MIDCAP FUT" t={t.midcap} fallback={midPos} />
-      <Ticker name="BANKNIFTY FUT" t={t.banknifty} />
+      <Ticker name="NIFTY 50" t={t.nifty} fallback={niftyPos} />
+      <Ticker name="NIFTY MIDCAP SELECT" t={t.midcap} fallback={midPos} />
+      <Ticker name="NIFTY BANK" t={t.banknifty} />
     </>
   )
 }

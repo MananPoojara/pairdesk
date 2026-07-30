@@ -3,15 +3,31 @@
 .pg-admin .panel {margin-bottom:14px}
 .pg-admin .pbody {padding:0 18px 18px}
 .pg-admin .frow {display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.pg-admin .pill {font-family:'JetBrains Mono';font-size:11px;font-weight:600;background:var(--soft);color:var(--primary);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
-.pg-admin .ed {color:var(--primary);cursor:pointer;font-weight:700;font-size:12.5px;user-select:none}
-.pg-admin .warn {display:flex;gap:8px;align-items:flex-start;background:#FBEAE1;color:#9A3412;border:1px solid #F4D6C6;border-radius:11px;padding:10px 13px;font-size:12px;font-weight:600;margin:12px 18px 0}
-.pg-admin .inote {color:var(--muted);font-size:12px;font-weight:600;margin-top:2px;line-height:1.5}
+.pg-admin .pill {font-family:var(--font-num);font-size:0.6875rem;font-weight:600;background:var(--soft);color:var(--primary);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+.pg-admin .ed {color:var(--primary);cursor:pointer;font-weight:700;font-size:0.78125rem;user-select:none}
+.pg-admin .warn {display:flex;gap:8px;align-items:flex-start;background:#FBEAE1;color:#9A3412;border:1px solid #F4D6C6;border-radius:11px;padding:10px 13px;font-size:0.75rem;font-weight:600;margin:12px 18px 0}
+.pg-admin .inote {color:var(--muted);font-size:0.75rem;font-weight:600;margin-top:2px;line-height:1.5}
 .pg-admin .tgrow {display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
-.pg-admin .tgrow .tl {font-weight:700;font-size:13.5px}
-.pg-admin .tgrow .ts {font-size:11.5px;color:var(--muted);font-weight:600;margin-top:3px}
+.pg-admin .tgrow .tl {font-weight:700;font-size:0.84375rem}
+.pg-admin .tgrow .ts {font-size:0.71875rem;color:var(--muted);font-weight:600;margin-top:3px}
 .pg-admin .savebar {display:flex;justify-content:flex-end;padding:14px 18px 18px}
 .pg-admin .dot {width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
 .pg-admin .dot.ok {background:var(--pos)}
 .pg-admin .dot.idle {background:var(--muted)}
-
+.pg-admin .client-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px}
+.pg-admin .lot-size-panel{margin-bottom:14px}
+.pg-admin .lot-size-panel>.pth .inote{margin-left:auto}
+.pg-admin .lot-size-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:6px 18px 18px}
+.pg-admin .lot-index{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+.pg-admin .lot-index-head{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--soft);border-bottom:1px solid var(--line)}
+.pg-admin .lot-index-head>b{font-size:.8125rem}
+.pg-admin .btn.mini{font-size:.6875rem;padding:5px 10px;border-radius:8px}
+.pg-admin .lot-index table{font-size:.75rem}
+.pg-admin .lot-index thead th{position:static}
+.pg-admin .lot-add-row input{width:100%;min-width:110px;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font:inherit}
+.pg-admin .lot-add-row td:last-child>div{display:flex;align-items:center;gap:5px}
+@media(max-width:760px){
+  .pg-admin .lot-size-grid{grid-template-columns:1fr}
+  .pg-admin .grid2{grid-template-columns:1fr}
+  .pg-admin .frow{grid-template-columns:1fr}
+}

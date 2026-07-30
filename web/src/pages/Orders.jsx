@@ -12,13 +12,13 @@ const CAT_COLOR = { Institution: '#0EA5E9', HNI: '#F97316', Retail: '#10B981' }
 function fDate(s) { if (!s) return '—'; const d = new Date(s + 'T00:00:00'); return d.getDate() + ' ' + MONTHS[d.getMonth()] + " '" + String(d.getFullYear()).slice(2) }
 function fExpiry(s) { if (!s) return '—'; const d = new Date(s + 'T00:00:00'); return d.getDate() + ' ' + MONTHS[d.getMonth()] }
 function fL(inr) {
-  const a = Math.abs(inr), sg = inr < 0 ? '−' : '+'
+  const a = Math.abs(inr), sg = inr < 0 ? '−' : ''
   if (a >= 1e7) return sg + '₹' + (a / 1e7).toFixed(2) + ' Cr'
   if (a >= 1e5) return sg + '₹' + (a / 1e5).toFixed(1) + ' L'
   if (a >= 1e3) return sg + '₹' + (a / 1e3).toFixed(1) + ' K'
   return sg + '₹' + Math.round(a).toLocaleString('en-IN')
 }
-const fCr = n => (n >= 0 ? '+' : '') + '₹' + Math.abs(n).toFixed(2) + ' Cr'
+const fCr = n => (n < 0 ? '−' : '') + '₹' + Math.abs(n).toFixed(2) + ' Cr'
 
 const Seg = ({ opts, val, on }) => (
   <div className="seg">{opts.map(o => (
@@ -37,7 +37,6 @@ export default function Orders() {
   const [range, setRange] = useState('All')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
-  const [q, setQ] = useState('')
   const [client, setClient] = useState('all')
   const [expanded, setExpanded] = useState(null)
 
@@ -61,8 +60,6 @@ export default function Orders() {
     if (side !== 'all' && t.direction.toLowerCase() !== side) return false
     if (sym !== 'all' && t.underlying !== sym) return false
     if (regime !== 'all' && t.regime !== regime) return false
-    const qq = q.toLowerCase()
-    if (qq && !(t.underlying + t.contract + t.client_name + t.client_code).toLowerCase().includes(qq)) return false
     return true
   })
 
@@ -165,7 +162,6 @@ export default function Orders() {
             <option value="all">All clients ({clients.length})</option>
             {clients.map(c => <option key={c.code} value={c.code}>{c.name} · {c.category}</option>)}
           </select>
-          <input className="srch-inp" placeholder="⌕ Search by symbol, client, contract…" value={q} onChange={e => { setQ(e.target.value); setExpanded(null) }} />
           <Seg val={regime} on={v => { setRegime(v); setExpanded(null) }} opts={[{ v: 'all', label: 'All regimes' }, { v: 'BULL', label: 'Bull' }, { v: 'BEAR', label: 'Bear' }]} />
         </div>
 
@@ -193,7 +189,7 @@ export default function Orders() {
                     <tr key={i} className={isExp ? 'exp-row' : undefined} onClick={() => setExpanded(isExp ? null : i)} style={{ cursor: 'pointer' }}>
                       <td className="m">{fDate(t.date)}</td>
                       <td><span style={{ fontWeight: 700 }}>{t.client_name}</span>
-                        <small style={{ display: 'block', fontSize: 10.5, color: 'var(--muted)', marginTop: 1 }}>
+                        <small style={{ display: 'block', fontSize: '0.65625rem', color: 'var(--muted)', marginTop: 1 }}>
                           <span className="cat-dot" style={{ background: CAT_COLOR[t.category] || '#999' }}></span>
                           {t.client_code} · {t.category}</small></td>
                       <td className="m">{t.underlying}-FUT</td>

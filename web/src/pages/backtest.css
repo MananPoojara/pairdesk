@@ -1,0 +1,74 @@
+/* Backtest page — minimal page-only CSS. Reuses global layout (shell, panel, pagehd, eq-modal,
+   seg, overlay, modal, eoy2) as-is; only the bits every page duplicates locally are here. */
+.pg-backtest .chips {display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pg-backtest .chip {border:1px solid var(--line);background:#fff;font-family:inherit;font-weight:700;font-size:0.75rem;color:#6b6457;padding:6px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.pg-backtest .chip.on {background:linear-gradient(135deg,var(--primary),var(--accent));border-color:transparent;color:#fff;box-shadow:0 6px 14px -8px rgba(249,115,22,.55)}
+.pg-backtest .chips-label {font-size:0.65625rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+
+.pg-backtest .scard {padding:18px 20px;display:flex;flex-direction:column}
+.pg-backtest .scard .hd {display:flex;align-items:flex-start;gap:12px}
+.pg-backtest .scard .nm {font-family:var(--font-ui);font-weight:700;font-size:1.1875rem;letter-spacing:-.01em}
+.pg-backtest .scard .st {font-size:0.75rem;color:var(--muted);font-weight:600;margin-top:3px}
+.pg-backtest .statrow {display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:16px}
+.pg-backtest .statrow .sc {background:var(--soft);border-radius:11px;padding:9px 11px}
+.pg-backtest .statrow .sc .l {font-size:0.5625rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pg-backtest .statrow .sc .v {font-family:var(--font-num);font-weight:600;font-size:0.9375rem;margin-top:5px}
+
+/* Net PnL + Performance Ratios side by side, each half the row — Net PnL keeps just the two
+   headline numbers + sparkline; every ratio/alpha stat moved into its own card beside it. */
+.pg-backtest .bt-hero-row {display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pg-backtest .bt-hero-row .scard {margin:0}
+.pg-backtest .bt-hero-statrow {grid-template-columns:repeat(2,1fr)}
+.pg-backtest .bt-hero-statrow .sc .v {font-size:1.375rem}
+.pg-backtest .bt-ratio-statrow {grid-template-columns:repeat(3,1fr);align-content:start;flex:1}
+
+.pg-backtest .spark {margin-top:14px}
+.pg-backtest .spark svg {width:100%;height:54px;display:block}
+.pg-backtest .legend {display:flex;gap:16px;font-size:0.71875rem;font-weight:700;color:#6b6457;margin-top:8px}
+.pg-backtest .legend i {display:inline-block;width:15px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.pg-backtest .eoy-leg-item {display:flex;align-items:center;font-size:0.6875rem;font-weight:700;color:#6b6457}
+.pg-backtest .eoy-leg-item i {width:15px;height:3px;border-radius:2px;display:inline-block;margin-right:6px}
+
+.pg-backtest .sechd {font-family:var(--font-ui);font-weight:700;font-size:0.875rem;display:flex;align-items:center;gap:10px;margin:2px 0 12px;padding:14px 16px 0}
+.pg-backtest .sechd .meta {font-size:0.6875rem;color:var(--muted);font-weight:600;letter-spacing:0}
+
+/* "Backtest vs NIFTY 50" child cards — bigger than the .sc stat tiles, each with a label, a big
+   value, and a small muted sub-caption (date range / Nifty's own figure / quarter label), matching
+   pinsec.ai's comparison-tile format. */
+.pg-backtest .bt-vs-grid {display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:4px 16px 16px}
+.pg-backtest .bt-vs-card {background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+.pg-backtest .bt-vs-card .l {font-size:0.59375rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pg-backtest .bt-vs-card .v {font-family:var(--font-num);font-weight:700;font-size:1.1875rem;margin-top:7px}
+.pg-backtest .bt-vs-card .sub {font-size:0.6875rem;color:var(--muted);font-weight:600;margin-top:5px}
+
+.pg-backtest .hm{grid-template-columns:26px repeat(13,minmax(0,1fr));row-gap:2px}
+.pg-backtest .hm .cell{aspect-ratio:auto;height:34px;font-size:1.0625rem;letter-spacing:-.02em;overflow:hidden}
+.pg-backtest .hm .cell.clickable{cursor:pointer}
+.pg-backtest .hm .cell.yr{font-weight:800;border:1px solid rgba(0,0,0,.12)}
+.pg-backtest .hmx-top{margin-top:16px;margin-bottom:6px}
+@media (min-width:1600px){ .pg-backtest .hm .cell{font-size:0.9375rem} }
+
+/* NIFTY 50 buy-and-hold sub-row, one under each year's strategy row — flat blue tint (not
+   heat-mapped like the strategy cells above it) so it reads as a comparison line, not another year. */
+.pg-backtest .hm .yl.nifty-yl{font-size:0.5rem;font-weight:800;color:#0369A1;letter-spacing:.02em;text-transform:uppercase;margin-bottom:6px}
+.pg-backtest .hm .cell.nifty-cell{height:20px;font-size:0.625rem;font-weight:700;background:color-mix(in srgb, #38BDF8 14%, transparent);color:#0369A1;margin-bottom:6px}
+.pg-backtest .hm .cell.nifty-cell.yr{border:1px solid color-mix(in srgb, #38BDF8 35%, transparent);font-weight:800}
+.pg-backtest .hm .cell.nifty-cell:hover{transform:none}
+
+.pg-backtest .equity-timeline{position:relative;height:18px;margin-top:5px}
+.pg-backtest .equity-timeline::before{content:"";position:absolute;left:8px;right:8px;top:4px;height:1px;background:#E7D6C0}
+.pg-backtest .timeline-tick{position:absolute;top:0;transform:translateX(-50%);padding-top:8px;font-family:var(--font-num);font-size:0.625rem;font-weight:800;color:#6b6457;white-space:nowrap}
+.pg-backtest .timeline-tick::before{content:"";position:absolute;left:50%;top:1px;width:1px;height:6px;background:#CDBFA9;transform:translateX(-50%)}
+.pg-backtest .timeline-tick:first-child{transform:translateX(0);text-align:left}.pg-backtest .timeline-tick:first-child::before{left:0;transform:none}
+.pg-backtest .timeline-tick:last-child{transform:translateX(-100%);text-align:right}.pg-backtest .timeline-tick:last-child::before{left:100%;transform:translateX(-100%)}
+
+@media(max-width:1100px) {
+  .pg-backtest .statrow {grid-template-columns:repeat(3,1fr)}
+  .pg-backtest .bt-hero-statrow {grid-template-columns:repeat(2,1fr)}
+  .pg-backtest .bt-vs-grid {grid-template-columns:repeat(3,1fr)}
+}
+
+@media(max-width:767px) {
+  .pg-backtest .bt-hero-row {grid-template-columns:1fr}
+  .pg-backtest .bt-vs-grid {grid-template-columns:repeat(2,1fr)}
+}

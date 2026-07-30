@@ -1,4 +1,6 @@
 // Clients-page equity curve geometry + heatmap + range filters — ported from mockups/clients.html.
+import { periodReturnPct, periodSharpe, periodMaxDdPct } from './returns'
+import { formatMonthlyReturn } from './dashboardPresentation'
 
 // ── curve geometry (shared by draw + hover) ──────────────────────────
 export function curveGeom(monthly) {
@@ -53,7 +55,7 @@ export function cellTxt(v) {
 }
 export function cellLbl(pct) {
   if (pct === null || pct === undefined) return ''
-  return (pct >= 0 ? '+' : '−') + Math.abs(pct).toFixed(2) + '%'
+  return (pct >= 0 ? '+' : '−') + formatMonthlyReturn(Math.abs(pct))
 }
 
 // ── range filter helpers ─────────────────────────────────────────────
@@ -78,34 +80,33 @@ export function filterMonthly(monthly, rangeKey) {
 export function filterTrades(trades, filtered) {
   if (!filtered.length) return []
   const fromMon = filtered[0].month.slice(0, 7)
-  return trades.filter(t => t.date.slice(0, 7) >= fromMon)
+  // Match on EXPIRY month (the key monthly buckets & combined_pl use), not entry date — a pair enters
+  // ~1 month before expiry, so entry-date filtering drops the first cycle (e.g. Apr-entry May-expiry).
+  return trades.filter(t => (t.expiry || t.date).slice(0, 7) >= fromMon)
 }
-export function computeStats(filtered, aumInr) {
+// Per-period stats on the capital in force each month (pay-in / pay-out timeline). A month carrying
+// `capital_inr` (the fut Combined book) uses that month's capital × baseFactor; a month without it
+// (BankNifty/Options variant) falls back to the flat aumInr. return %/Sharpe/DD are all capital-aware.
+export function computeStats(filtered, aumInr, baseFactor = 1) {
   if (!filtered.length) return { net_inr: 0, return_pct: 0, gross_inr: 0, charges_inr: 0, sharpe: 0, win_rate: 0, wins: 0, total_months: 0, max_dd_pct: 0, best_month_inr: 0, worst_month_inr: 0 }
-  const hasCapital = Number.isFinite(aumInr) && aumInr > 0
+  const fb = baseFactor || 1
+  // Normalise to {net_inr, capital_inr}: fall back to aumInr/fb so capital×fb = aumInr for variant months.
+  const rows = filtered.map(m => ({
+    net_inr: m.net_inr,
+    capital_inr: (m.capital_inr != null && m.capital_inr > 0) ? m.capital_inr : (aumInr > 0 ? aumInr / fb : 0),
+  }))
   const nets = filtered.map(m => m.net_inr)
-  const cumArr = filtered.map(m => m.cumulative_inr)
-  const totalNet = cumArr[cumArr.length - 1] || 0
+  const totalNet = nets.reduce((a, b) => a + b, 0)
   const wins = nets.filter(n => n > 0).length
-  let sharpe = 0
-  if (filtered.length >= 2 && hasCapital) {
-    const pcts = nets.map(n => n / aumInr * 100)
-    const mean = pcts.reduce((a, b) => a + b, 0) / pcts.length
-    const variance = pcts.map(p => (p - mean) ** 2).reduce((a, b) => a + b, 0) / (pcts.length - 1)
-    const std = Math.sqrt(variance)
-    sharpe = std === 0 ? 0 : +((mean / std * Math.sqrt(12)).toFixed(2))
-  }
-  let peak = 0, maxDD = 0
-  cumArr.forEach(v => { if (v > peak) peak = v; const dd = peak === 0 ? 0 : (peak - v) / peak; if (dd > maxDD) maxDD = dd })
   return {
     net_inr: Math.round(totalNet),
-    return_pct: hasCapital ? +(totalNet / aumInr * 100).toFixed(2) : 0,
+    return_pct: periodReturnPct(rows, fb),
     gross_inr: Math.round(filtered.reduce((s, m) => s + m.gross_inr, 0)),
     charges_inr: Math.round(filtered.reduce((s, m) => s + m.charges_inr, 0)),
-    sharpe,
+    sharpe: periodSharpe(rows, fb),
     win_rate: filtered.length ? +(wins / filtered.length * 100).toFixed(1) : 0,
     wins, total_months: filtered.length,
-    max_dd_pct: +(maxDD * 100).toFixed(2),
+    max_dd_pct: periodMaxDdPct(rows, fb),
     best_month_inr: Math.round(Math.max(...nets)),
     worst_month_inr: Math.round(Math.min(...nets)),
   }
@@ -117,4 +118,4 @@ export const RFULL = { all: 'All time', '2y': 'Last 2 years', '1y': 'Last 1 year
 export const CAT_ORDER = ['Institution', 'HNI', 'Retail']
 export const CAT_CLS = { Institution: 'inst', HNI: 'hni', Retail: 'retail' }
 export const CAT_LBL = { Institution: 'INST', HNI: 'HNI', Retail: 'RETAIL' }
-export const CAT_RANGE = { Institution: '>₹100 Cr', HNI: '₹10–100 Cr', Retail: '<₹10 Cr' }
+export const CAT_RANGE = { Institution: '>₹10 Cr', HNI: '₹50L–10 Cr', Retail: '₹25L–50L' }

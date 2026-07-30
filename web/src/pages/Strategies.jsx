@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../api/client'
 import DateRangeControl from '../components/DateRangeControl'
 import MarketTickers from '../components/MarketTickers'
+import LegPerformanceModal from '../components/LegPerformanceModal'
 import { buildCurvePath, hmColor, hmText } from '../lib/curve'
 import { fmtNum } from '../lib/format'
 import {
@@ -16,9 +16,12 @@ import {
   selectDashboardRange,
 } from '../lib/dashboardRange'
 import {
+  adaptiveTicks,
   buildBacktestRows,
   buildDateCurvePath,
+  compoundYearlyPct,
   dateLinePoints,
+  dateMs,
   equityDomain,
   equityValueDomain,
   timelineTicks,
@@ -30,17 +33,46 @@ import {
   returnQuantiles,
   rollingSharpe,
   worstDrawdowns,
-  yearlyReturns,
 } from '../lib/riskAnalytics'
 import { VARIANTS } from '../lib/variantData'
+import { INDEX_YEARLY } from '../lib/indexYearly'
+import { formatMonthlyReturn } from '../lib/dashboardPresentation'
+import { FloatingTooltip } from '../components/ViewportTooltip'
 import './strategies.css'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const monthLabel = m => { const d = new Date(m + 'T00:00:00Z'); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
 const monthShort = m => { const d = new Date(m + 'T00:00:00Z'); return `${MONTHS[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(2)}` }
-const fCr = n => `${n >= 0 ? '+' : '−'}₹${Math.abs(n).toFixed(2)} Cr`
+const fCr = n => `${n < 0 ? '−' : ''}₹${Math.abs(n).toFixed(2)} Cr`
 const pctS = n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 const uD = n => (n >= 0 ? 'u' : 'd')
+// Main strategy card only: no leading "+", no "₹" on Net PnL (per design) — keep "−" for negatives.
+const fCrNoSign = n => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(2)} Cr`
+const fCrNoPlus = n => `${n < 0 ? '−' : ''}₹${Math.abs(n).toFixed(2)} Cr`
+const pctNoPlus = n => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(2)}%`
+const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000)
+
+// Buy-and-hold NIFTY/MIDCAP comparison for the "Compare strategies" table — compounds INDEX_YEARLY's
+// yearly % across the years present in the currently-selected range, applied to the same AUM base.
+function buildIndexCompare(curveMonthly, key, aumCr) {
+  const years = [...new Set((curveMonthly || []).map(r => String(r.month).slice(0, 4)))]
+    .filter(y => INDEX_YEARLY[y]?.[key] != null)
+  if (!years.length) return { net_inr: 0, pct: 0, cagr_pct: 0, trades: 0, win_rate: 0, sharpe: 0, max_dd_pct: 0 }
+  const rets = years.map(y => INDEX_YEARLY[y][key])
+  const compounded = rets.reduce((acc, r) => acc * (1 + r / 100), 1)
+  const pct = (compounded - 1) * 100
+  const cagr_pct = (Math.pow(compounded, 1 / years.length) - 1) * 100
+  const net_inr = Math.round(aumCr * 1e7 * (compounded - 1))
+  // Standalone buy-and-hold risk stats, at the same (yearly) granularity as the return series itself —
+  // "trades" = number of calendar years in the visible range, one long-only holding period each.
+  const wins = rets.filter(r => r > 0).length
+  const win_rate = +(wins / rets.length * 100).toFixed(1)
+  const mean = rets.reduce((s, r) => s + r, 0) / rets.length
+  const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length
+  const sharpe = variance > 0 ? +(mean / Math.sqrt(variance)).toFixed(2) : 0
+  let cum = 1, peak = 1, maxDd = 0
+  for (const r of rets) { cum *= (1 + r / 100); peak = Math.max(peak, cum); maxDd = Math.min(maxDd, (cum / peak - 1) * 100) }
+  return { net_inr, pct, cagr_pct, trades: years.length, win_rate, sharpe, max_dd_pct: maxDd }
+}
 const EQ_W = 760
 const EQ_H = 150
 const EQ_PAD = 8
@@ -48,6 +80,7 @@ const EQ_PAD = 8
 export default function Strategies() {
   const { data, isError, error } = useQuery({ queryKey: ['strategies'], queryFn: () => apiGet('/api/strategies') })
   const { data: dash } = useQuery({ queryKey: ['dashboard'], queryFn: () => apiGet('/api/dashboard') })
+  const { data: optData } = useQuery({ queryKey: ['option-trades'], queryFn: () => apiGet('/api/option-trades'), staleTime: Infinity })
   const [range, setRange] = useState('All')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
@@ -57,6 +90,7 @@ export default function Strategies() {
   const [showDetail, setShowDetail] = useState(false)   // card-first: reveal the full breakdown on click
   const [indexChip, setIndexChip] = useState('combined')
   const [instrMode, setInstrMode] = useState('fut')
+  const [monthModal, setMonthModal] = useState(null)
 
   const tk = {
     nifty: dash?.positions?.find(p => p.underlying === 'NIFTY'),
@@ -68,7 +102,7 @@ export default function Strategies() {
 
   // Variant selection: Options (instrument toggle) or BankNifty (index chip) swap in
   // hardcoded, verified showcase data; otherwise the live Fut/Combined strategy from the API.
-  const activeVariant = instrMode === 'opt' ? VARIANTS.options
+  const activeVariant = instrMode === 'opt' ? (optData?.summary ? optData : VARIANTS.options)
     : indexChip === 'banknifty' ? VARIANTS.banknifty
     : null
   // Fut + Nifty/Midcap chip → show that leg of the pair only (options disables the index chips).
@@ -85,8 +119,9 @@ export default function Strategies() {
     ? selectDashboardDateRange(monthly, startDate, endDate)
     : selectDashboardRange(monthly, range)
   const strategyStats = buildDashboardRangeStats(selectedMonthly, s.base_aum_cr ?? 30)
-  // Leg views use the leg's own drawdown; variants/combined use the pair reference DD.
-  const pairMaxDd = legFilter ? capitalMaxDrawdownPct(strategyStats.monthly, s.base_aum_cr ?? 30) : Number(s.pair_max_dd_pct ?? s.max_dd_pct ?? 0)
+  // Live, range-aware Max DD from the selected-range curve — only backtested variants (Options/
+  // BankNifty) keep their published static DD, same pattern as the Dashboard.
+  const pairMaxDd = activeVariant ? Number(s.pair_max_dd_pct ?? s.max_dd_pct ?? 0) : capitalMaxDrawdownPct(strategyStats.monthly, s.base_aum_cr ?? 30)
   const curveMonthly = strategyStats.monthly
   const chartDomain = equityDomain(startDate, endDate, curveMonthly)
   const liveRows = curveMonthly.map(row => ({ date: row.month, value: Number(row.cumulative_inr) || 0 }))
@@ -110,10 +145,11 @@ export default function Strategies() {
   const worstDrawdownRows = worstDrawdowns(curveMonthly, s.aum_cr, 5)
   const quantileRows = returnQuantiles(curveMonthly, s.aum_cr)
   // Variants precompute correct per-year (compounded) stats; net_inr-derived yearly over-inflates them.
-  const yearRows = activeVariant ? activeVariant.yearly : yearlyReturns(monthly, s.base_aum_cr ?? 30)
   const dispSharpe = activeVariant ? s.sharpe : strategyStats.sharpe
   const legSummary = buildLegSummary(curveMonthly, s.aum_cr)
-  const legYearRows = buildLegYearRows(monthly, yearRows)
+  // Compare-tab benchmark: buy-and-hold NIFTY/MIDCAP over the years in the selected range.
+  const niftyCompare = buildIndexCompare(curveMonthly, 'nifty', s.aum_cr)
+  const midcapCompare = buildIndexCompare(curveMonthly, 'midcap', s.aum_cr)
 
   function applyPreset(nextRange) {
     setRange(nextRange)
@@ -137,7 +173,6 @@ export default function Strategies() {
     <div className="pg-strategies">
       <div className="subbar"><div className="in">
         <MarketTickers dash={dash} />
-        <div className="ti"><span className="n">Data as of</span><span className="v">{dash?.latest_date || '—'}</span></div>
         <div className="rt">
           <DateRangeControl
             range={range}
@@ -154,17 +189,17 @@ export default function Strategies() {
 
       <div className="shell">
         <div className="pagehd fu">
-          <div><div className="title">Strategies</div><div className="crumb" style={{ marginBottom: 0 }}>1 active · compare &amp; analyse</div></div>
+          <div><div className="title">Strategies</div></div>
           <div className="controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
             <div className="chips">
-              <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 4 }}>Index</span>
+              <span style={{ fontSize: '0.65625rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 4 }}>Index</span>
               {[['combined', 'Combined'], ['nifty', 'NIFTY 50'], ['midcap', 'NIFTY MID SELECT'], ['banknifty', 'BANK NIFTY']].map(([k, label]) => (
                 <button key={k} disabled={instrMode === 'opt'} className={'chip' + (indexChip === k ? ' on' : '')}
                   onClick={() => instrMode !== 'opt' && setIndexChip(k)}>{label}</button>
               ))}
             </div>
             <div className="chips">
-              <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 4 }}>Instrument</span>
+              <span style={{ fontSize: '0.65625rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginRight: 4 }}>Instrument</span>
               <button className={'chip' + (instrMode === 'fut' ? ' on' : '')} onClick={() => setInstrMode('fut')}>Fut</button>
               <button className={'chip' + (instrMode === 'opt' ? ' on' : '')} onClick={() => setInstrMode('opt')}>Options</button>
             </div>
@@ -174,19 +209,19 @@ export default function Strategies() {
         {/* strategy cards */}
         <div className="scards fu" style={{ animationDelay: '.04s' }}>
           <div className="panel scard scard-click" onClick={() => setShowDetail(v => !v)} style={{ cursor: 'pointer' }}
-            title={showDetail ? 'Hide full breakdown' : 'Click to view full breakdown'}>
+            data-tooltip={showDetail ? 'Hide full breakdown' : 'Click to view full breakdown'}>
             <div className="hd">
               <div><div className="nm">{s.name}</div><div className="st">{s.subtitle}</div></div>
               <span className={'badge ' + (activeVariant || legFilter ? 'soon' : 'act')}>{activeVariant ? '◔ Spot-backtested' : legFilter ? '◔ Indicative' : '● Active'}</span>
             </div>
             <div className="statrow">
-              <Sc l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} />
-              <Sc l="Net Return" cls={uD(strategyStats.return_pct)} v={pctS(strategyStats.return_pct)} />
+              <Sc l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCrNoSign(strategyStats.total_net_inr / 1e7)} />
+              <Sc l="Net Return" cls={uD(strategyStats.return_pct)} v={pctNoPlus(strategyStats.return_pct)} />
               <Sc l="Trades" v={activeVariant ? s.trades : rangeTrades} />
               <Sc l="Win %" v={strategyStats.win_rate + '%'} />
               <Sc l="Sharpe" v={dispSharpe} />
               <Sc l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
-              <Sc l="CAGR" cls="u" v={'~' + s.cagr_pct + '%'} />
+              <Sc l="CAGR" cls={uD(riskMetrics.cagr_pct)} v={`${riskMetrics.cagr_pct}%`} />
             </div>
             <div className="spark">
               <svg viewBox="0 0 700 54" preserveAspectRatio="none">
@@ -203,23 +238,23 @@ export default function Strategies() {
 
           <div className="panel scard ghost">
             <div className="hd"><div><div className="nm">Index Momentum</div><div className="st">Trend-follow · index futures</div></div><span className="badge soon">Coming soon</span></div>
-            <div className="ghbody"><div className="big">◴</div><div style={{ fontSize: 12, fontWeight: 700 }}>In research</div><div style={{ fontSize: 11 }}>Research underway · target H2 FY27</div></div>
+            <div className="ghbody"><div className="big">◴</div><div style={{ fontSize: '0.75rem', fontWeight: 700 }}>In research</div><div style={{ fontSize: '0.6875rem' }}>Research underway · target H2 FY27</div></div>
           </div>
           <div className="panel scard ghost">
             <div className="hd"><div><div className="nm">Vol Carry</div><div className="st">Options · short-vol overlay</div></div><span className="badge soon">Coming soon</span></div>
-            <div className="ghbody"><div className="big">◴</div><div style={{ fontSize: 12, fontWeight: 700 }}>In research</div><div style={{ fontSize: 11 }}>Concept stage · not deployed</div></div>
+            <div className="ghbody"><div className="big">◴</div><div style={{ fontSize: '0.75rem', fontWeight: 700 }}>In research</div><div style={{ fontSize: '0.6875rem' }}>Concept stage · not deployed</div></div>
           </div>
         </div>
 
         {/* variant banner — real hardcoded showcase data for the selected variant */}
         {activeVariant && (
-          <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.75rem' }}>
             <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{s.name}</span>
             <span style={{ color: 'var(--muted)' }}>{s.subtitle} · backtested variant (indicative, on ₹{s.base_aum_cr} Cr base)</span>
           </div>
         )}
         {legFilter && (
-          <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.75rem' }}>
             <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{legLabel} only</span>
             <span style={{ color: 'var(--muted)' }}>Showing the {legFilter === 'nifty' ? 'Nifty' : 'Midcap'} leg's P&amp;L of the pair (the other leg excluded).</span>
           </div>
@@ -231,15 +266,15 @@ export default function Strategies() {
           {/* equity curve */}
           <div className="panel c8 flexcol" style={{ padding: '16px 18px' }}>
             <div className="t-l" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <b style={{ fontFamily: "'Familjen Grotesk'", fontWeight: 700, fontSize: 16, marginRight: 'auto' }}>Pair Trading — Equity Curve</b>
-              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{activeVariant ? 'spot-backtested · monthly EOD' : legFilter ? 'indicative leg · monthly EOD' : 'cumulative net PnL · monthly EOD'}</span>
+              <b style={{ fontFamily: "'Familjen Grotesk'", fontWeight: 700, fontSize: '1rem', marginRight: 'auto' }}>Pair Trading — Equity Curve</b>
+              <span style={{ fontSize: '0.6875rem', color: 'var(--muted)', fontWeight: 600 }}>{activeVariant ? 'spot-backtested · monthly EOD' : legFilter ? 'indicative leg · monthly EOD' : 'cumulative net PnL · monthly EOD'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 12 }}>
-              <div className={'m ' + uD(strategyStats.total_net_inr)} style={{ fontSize: 26, fontWeight: 600 }}>{fCr(strategyStats.total_net_inr / 1e7)} <span style={{ fontSize: 14 }}>/ {pctS(strategyStats.return_pct)}</span></div>
+              <div className={'m ' + uD(strategyStats.total_net_inr)} style={{ fontSize: '1.625rem', fontWeight: 600 }}>{fCr(strategyStats.total_net_inr / 1e7)} <span style={{ fontSize: '0.875rem' }}>/ {pctS(strategyStats.return_pct)}</span></div>
               <div className="pills">
                 <div className="pill"><div className="l">Best mo</div><div className="v u">{pctS(Number.isFinite(bestMo) ? bestMo : 0)}</div></div>
                 <div className="pill"><div className="l">Worst mo</div><div className="v d">{pctS(Number.isFinite(worstMo) ? worstMo : 0)}</div></div>
-                <div className="pill"><div className="l">CAGR</div><div className="v u">~{s.cagr_pct}%</div></div>
+                <div className="pill"><div className="l">CAGR</div><div className={'v ' + uD(riskMetrics.cagr_pct)}>{riskMetrics.cagr_pct}%</div></div>
               </div>
             </div>
             <div style={{ marginTop: 14, flex: 1, display: 'flex', alignItems: 'flex-end' }}>
@@ -271,13 +306,13 @@ export default function Strategies() {
                   />
                 </svg>
                 {equityTip && curveMonthly[equityTip.index] && (
-                  <div className="qa-tip" style={{ left: `${equityTip.xPct}%`, top: `${equityTip.yPct}%` }}>
+                  <FloatingTooltip x={equityTip.clientX} y={equityTip.clientY} className="chart-tooltip">
                     <span>{monthShort(curveMonthly[equityTip.index].month)}</span>
                     <b>{fCr(curveMonthly[equityTip.index].cumulative_inr / 1e7)}</b>
                     {showBacktest && equityTip.backtestIndex != null && backtestRows[equityTip.backtestIndex] && (
                       <em>Spot benchmark {fCr(backtestRows[equityTip.backtestIndex].value / 1e7)}</em>
                     )}
-                  </div>
+                  </FloatingTooltip>
                 )}
                 <div className="equity-timeline" aria-label="Equity curve timeline">
                   {timeline.map(tick => (
@@ -288,7 +323,7 @@ export default function Strategies() {
             </div>
             <div className="legend">
               <span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL ({activeVariant ? 'spot-backtested' : legFilter ? 'indicative leg' : 'realised'})</span>
-              {backtestRows.length > 0 && <span onClick={() => setShowBacktest(v => !v)} title="Click to show/hide the spot benchmark" style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}><i style={{ background: '#F97316' }}></i>Spot benchmark</span>}
+              {backtestRows.length > 0 && <span onClick={() => setShowBacktest(v => !v)} data-tooltip="Click to show or hide the spot benchmark" style={{ cursor: 'pointer', userSelect: 'none', opacity: showBacktest ? 1 : 0.42 }}><i style={{ background: '#F97316' }}></i>Spot benchmark</span>}
             </div>
           </div>
 
@@ -308,61 +343,14 @@ export default function Strategies() {
           {/* MoM heatmap — full width so the cells are wide like the dashboard */}
           <div className="panel c12 flexcol">
             <div className="sechd">Month-on-Month Net % <span className="meta">net return · % of AUM</span></div>
-            <div style={{ padding: '4px 16px 12px' }}>
-              <Heatmap monthly={curveMonthly} />
-              <div className="hmx"><span></span>{['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => <span key={i}>{m}</span>)}</div>
+            <div className="hm-scroll" style={{ padding: '4px 16px 12px' }}>
+              <div className="hmx hmx-top" style={{ gridTemplateColumns: '26px repeat(13,1fr)' }}><span></span>{['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'].map((m, i) => <span key={i}>{m}</span>)}<span>YEAR</span></div>
+              <Heatmap monthly={curveMonthly} onCellClick={setMonthModal} />
             </div>
           </div>
 
-          {/* Monthly detail table */}
-          <div className="panel c5 flexcol">
-            <div className="sechd">Monthly detail <span className="meta">net return · %</span></div>
-            <div className="tscroll" style={{ marginTop: 4 }}>
-              <table>
-                <thead><tr><th>Month</th><th className="num">Net %</th></tr></thead>
-                <tbody>
-                  {[...curveMonthly].reverse().map(m => (
-                    <tr key={m.month}>
-                      <td>{monthLabel(m.month)}</td>
-                      <td className={'num m ' + uD(m.pct)}>{pctS(m.pct)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* YoY table */}
-          <div className="panel c7 flexcol">
-            <div className="sechd">Year-on-Year <span className="meta">PnL in ₹ &amp; %</span></div>
-            <div className="tscroll" style={{ marginTop: 4 }}>
-              <table>
-                <thead><tr><th>Year</th>
-                  {activeVariant
-                    ? <><th className="num">Net P/L</th><th className="num">Net Return %</th></>
-                    : <><th className="num">Midcap P/L</th><th className="num">NIFTY P/L</th></>}
-                  <th className="num">Max DD %</th><th className="num">Sharpe</th></tr></thead>
-                <tbody>
-                  {legYearRows.map((y, i) => (
-                    <tr key={y.year}>
-                      <td>{y.year}{i === legYearRows.length - 1 ? ' YTD' : ''}</td>
-                      {activeVariant
-                        ? <><td className={'num m ' + uD(y.net_inr)}>{fCr((y.net_inr || 0) / 1e7)}</td>
-                             <td className={'num m ' + uD(y.return_pct)}>{pctS(y.return_pct || 0)}</td></>
-                        : <><td className={'num m ' + uD(y.midcap_net_inr)}>{fCr(y.midcap_net_inr / 1e7)}</td>
-                             <td className={'num m ' + uD(y.nifty_net_inr)}>{fCr(y.nifty_net_inr / 1e7)}</td></>}
-                      <td className="num m d">−{y.max_dd_pct}%</td>
-                      <td className="num m">{y.sharpe}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="note-inline" style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, padding: '0 16px 14px', marginTop: 'auto' }}>
-                  Total: {s.trades} trades · {fCr(s.net_cr)} · {pctS(s.return_pct)} · single client · ₹{s.aum_cr.toFixed(0)} Cr AUM.
-            </div>
-          </div>
         </div>
+        {monthModal && <LegPerformanceModal period={monthModal} monthly={curveMonthly} scaleInr={n => n} onClose={() => setMonthModal(null)} />}
 
         <div className="detail-action-row fu" style={{ animationDelay: '.1s' }}>
           <button className={'chip detail-toggle ' + (showDetailedStats ? 'on' : '')} onClick={() => setShowDetailedStats(v => !v)}>Detailed Stats</button>
@@ -371,11 +359,11 @@ export default function Strategies() {
         {showDetailedStats && (
           <div className="analytics-grid fu" style={{ animationDelay: '.12s' }}>
             <div className="panel qa-card">
-              <div className="qa-head"><b>Underwater / Drawdown</b><span>equity from capital base</span></div>
+              <div className="qa-head"><b>Underwater / Drawdown</b></div>
               <UnderwaterChart data={drawdownSeries} />
             </div>
             <div className="panel qa-card">
-              <div className="qa-head"><b>Rolling 12M Sharpe</b><span>monthly returns · annualized</span></div>
+              <div className="qa-head"><b>Rolling 12M Sharpe</b></div>
               <RollingSharpeChart data={rollingSharpe12} />
             </div>
             <div className="panel qa-card qa-card-wide">
@@ -383,7 +371,7 @@ export default function Strategies() {
               <RiskMetricMatrix metrics={riskMetrics} />
             </div>
             <div className="panel qa-card qa-card-wide">
-              <div className="qa-head"><b>Worst-5 Drawdown Periods</b><span>equity curve · shaded drawdown windows</span></div>
+              <div className="qa-head"><b>Worst-5 Drawdown Periods</b></div>
               <WorstDrawdownsPanel rows={worstDrawdownRows} series={drawdownSeries} />
             </div>
             <div className="panel qa-card qa-card-wide">
@@ -395,26 +383,37 @@ export default function Strategies() {
 
         {/* compare */}
         <div className="panel cmp fu" style={{ marginTop: 14, animationDelay: '.12s' }}>
-          <div className="sechd">Compare strategies <span className="meta">Pair Trading vs pipeline</span></div>
-          <div className="tscroll" style={{ marginTop: 2 }}>
+          <div className="sechd">Compare strategies</div>
+          <div style={{ marginTop: 2 }}>
             <table>
-              <thead><tr><th>Metric</th><th className="num hl">Pair Trading <span className="tag">Active</span></th><th className="num">Index Momentum</th><th className="num">Vol Carry</th></tr></thead>
+              <thead><tr><th>Metric</th><th className="num hl">Pair Trading <span className="tag">Active</span></th><th className="num">NIFTY Futures</th><th className="num">MIDCPNIFTY Futures</th></tr></thead>
               <tbody>
-                <Cmp l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCr(strategyStats.total_net_inr / 1e7)} />
-                <Cmp l="Return %" cls={uD(strategyStats.return_pct)} v={pctS(strategyStats.return_pct)} />
+                <Cmp l="Net PnL" cls={uD(strategyStats.total_net_inr)} v={fCrNoPlus(strategyStats.total_net_inr / 1e7)}
+                  niftyV={fCrNoPlus(niftyCompare.net_inr / 1e7)} niftyCls={uD(niftyCompare.net_inr)}
+                  midcapV={fCrNoPlus(midcapCompare.net_inr / 1e7)} midcapCls={uD(midcapCompare.net_inr)} />
+                <Cmp l="Return %" cls={uD(strategyStats.return_pct)} v={pctNoPlus(strategyStats.return_pct)}
+                  niftyV={pctNoPlus(niftyCompare.pct)} niftyCls={uD(niftyCompare.pct)}
+                  midcapV={pctNoPlus(midcapCompare.pct)} midcapCls={uD(midcapCompare.pct)} />
+                <Cmp l="CAGR" cls={uD(riskMetrics.cagr_pct)} v={`${riskMetrics.cagr_pct}%`}
+                  niftyV={`${niftyCompare.cagr_pct.toFixed(1)}%`} niftyCls={uD(niftyCompare.cagr_pct)}
+                  midcapV={`${midcapCompare.cagr_pct.toFixed(1)}%`} midcapCls={uD(midcapCompare.cagr_pct)} />
                 {!activeVariant && <>
-                  <Cmp l="Midcap P/L" cls={uD(legSummary.midcap.net_inr)} v={fCr(legSummary.midcap.net_inr / 1e7)} />
-                  <Cmp l="Midcap P/L %" cls={uD(legSummary.midcap.pct)} v={pctS(legSummary.midcap.pct)} />
-                  <Cmp l="NIFTY P/L" cls={uD(legSummary.nifty.net_inr)} v={fCr(legSummary.nifty.net_inr / 1e7)} />
-                  <Cmp l="NIFTY P/L %" cls={uD(legSummary.nifty.pct)} v={pctS(legSummary.nifty.pct)} />
-                  <Cmp l="Combined P/L" cls={uD(legSummary.combined.net_inr)} v={fCr(legSummary.combined.net_inr / 1e7)} />
-                  <Cmp l="Combined P/L %" cls={uD(legSummary.combined.pct)} v={pctS(legSummary.combined.pct)} />
+                  <Cmp l="Midcap P/L" cls={uD(legSummary.midcap.net_inr)} v={fCrNoPlus(legSummary.midcap.net_inr / 1e7)} />
+                  <Cmp l="Midcap P/L %" cls={uD(legSummary.midcap.pct)} v={pctNoPlus(legSummary.midcap.pct)} />
+                  <Cmp l="NIFTY P/L" cls={uD(legSummary.nifty.net_inr)} v={fCrNoPlus(legSummary.nifty.net_inr / 1e7)} />
+                  <Cmp l="NIFTY P/L %" cls={uD(legSummary.nifty.pct)} v={pctNoPlus(legSummary.nifty.pct)} />
+                  <Cmp l="Combined P/L" cls={uD(legSummary.combined.net_inr)} v={fCrNoPlus(legSummary.combined.net_inr / 1e7)} />
+                  <Cmp l="Combined P/L %" cls={uD(legSummary.combined.pct)} v={pctNoPlus(legSummary.combined.pct)} />
                 </>}
-                <Cmp l="Trades" v={activeVariant ? s.trades : rangeTrades} />
-                <Cmp l="Win %" v={strategyStats.win_rate + '%'} />
-                <Cmp l="Sharpe" v={dispSharpe} />
-                <Cmp l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'} />
-                <Cmp l="CAGR" cls="u" v={'~' + riskMetrics.cagr_pct + '%'} />
+                <Cmp l="Trades" v={activeVariant ? s.trades : rangeTrades}
+                  niftyV={niftyCompare.trades} midcapV={midcapCompare.trades} />
+                <Cmp l="Win %" v={strategyStats.win_rate + '%'}
+                  niftyV={niftyCompare.win_rate + '%'} midcapV={midcapCompare.win_rate + '%'} />
+                <Cmp l="Sharpe" v={dispSharpe}
+                  niftyV={niftyCompare.sharpe} midcapV={midcapCompare.sharpe} />
+                <Cmp l="Max DD" cls="d" v={'−' + pairMaxDd.toFixed(2) + '%'}
+                  niftyV={'−' + Math.abs(niftyCompare.max_dd_pct).toFixed(2) + '%'} niftyCls="d"
+                  midcapV={'−' + Math.abs(midcapCompare.max_dd_pct).toFixed(2) + '%'} midcapCls="d" />
               </tbody>
             </table>
           </div>
@@ -433,11 +432,11 @@ function Ticker({ name, p }) {
 }
 const Sc = ({ l, v, cls }) => <div className="sc"><div className="l">{l}</div><div className={'v ' + (cls || '')}>{v}</div></div>
 const Sg = ({ l, v, cls, small }) => <div className="sg"><div className="l">{l}</div><div className={'v ' + (cls || '')}>{v}{small && <small>{small}</small>}</div></div>
-const Cmp = ({ l, v, cls }) => (
+const Cmp = ({ l, v, cls, niftyV, niftyCls, midcapV, midcapCls }) => (
   <tr><td className="nmcol">{l}</td>
     <td className={'num hl ' + (cls || '')}>{v}</td>
-    <td className="num m" style={{ color: 'var(--muted)' }}>—</td>
-    <td className="num m" style={{ color: 'var(--muted)' }}>—</td></tr>
+    <td className={'num m ' + (niftyV != null ? (niftyCls || '') : '')} style={niftyV == null ? { color: 'var(--muted)' } : undefined}>{niftyV ?? '—'}</td>
+    <td className={'num m ' + (midcapV != null ? (midcapCls || '') : '')} style={midcapV == null ? { color: 'var(--muted)' } : undefined}>{midcapV ?? '—'}</td></tr>
 )
 
 function buildLegSummary(rows, aumCr) {
@@ -453,37 +452,35 @@ function buildLegSummary(rows, aumCr) {
   }
 }
 
-function buildLegYearRows(rows, combinedYears) {
-  const map = new Map()
-  ;(rows || []).forEach(row => {
-    const year = String(row.month || '').slice(0, 4)
-    if (!map.has(year)) map.set(year, { midcap_net_inr: 0, nifty_net_inr: 0 })
-    const target = map.get(year)
-    target.midcap_net_inr += Number(row.midcap_net_inr) || 0
-    target.nifty_net_inr += Number(row.nifty_net_inr) || 0
-  })
-  return (combinedYears || []).map(row => ({
-    ...row,
-    midcap_net_inr: Math.round(map.get(row.year)?.midcap_net_inr || 0),
-    nifty_net_inr: Math.round(map.get(row.year)?.nifty_net_inr || 0),
-  }))
-}
-
-function Heatmap({ monthly }) {
+function Heatmap({ monthly, onCellClick }) {
   const map = {}
   monthly.forEach(m => { const d = new Date(m.month + 'T00:00:00Z'); map[`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`] = m.pct })
   const years = [...new Set(monthly.map(m => m.month.slice(0, 4)))].sort()
   return (
-    <div className="hm">
+    <div className="hm" style={{ gridTemplateColumns: '26px repeat(13,minmax(0,1fr))' }}>
       {years.flatMap(y => {
         const cells = [<div key={y + 'yl'} className="yl">{"'" + y.slice(2)}</div>]
         for (let mo = 1; mo <= 12; mo++) {
           const key = `${y}-${mo}`
           const pct = key in map ? map[key] : null
-          const lbl = pct === null ? '' : (pct >= 0 ? '+' : '−') + Math.abs(pct).toFixed(2) + '%'
-          cells.push(<div key={key} className="cell" style={{ background: hmColor(pct), color: hmText(pct) }}
-            title={`${y}-${mo < 10 ? '0' : ''}${mo}: ${pct === null ? 'No data' : (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%'}`}>{lbl}</div>)
+          const lbl = pct === null ? '' : (pct >= 0 ? '+' : '−') + formatMonthlyReturn(Math.abs(pct))
+          const clickable = pct !== null && !!onCellClick
+          const monthISO = `${y}-${mo < 10 ? '0' : ''}${mo}`
+          cells.push(<div key={key} className={'cell' + (clickable ? ' clickable' : '')} style={{ background: hmColor(pct), color: hmText(pct) }}
+            data-tooltip={`${monthISO}: ${pct === null ? 'No data' : (pct >= 0 ? '+' : '−') + formatMonthlyReturn(Math.abs(pct))}` + (clickable ? ' · click for leg breakdown' : '')}
+            onClick={clickable ? () => onCellClick({ months: [monthISO], plabel: null, month: monthISO, quarter: false }) : undefined}>{lbl}</div>)
         }
+        const yearRows = monthly.filter(m => m.month.slice(0, 4) === y)
+        const yp = compoundYearlyPct(yearRows.map(m => m.pct))
+        const yrClickable = yearRows.length > 0 && !!onCellClick
+        const fireYear = () => onCellClick({ months: yearRows.map(m => m.month.slice(0, 7)), plabel: y, quarter: false })
+        cells.push(
+          <div key={y + 'yr'} className={'cell yr' + (yrClickable ? ' clickable' : '')} style={{ background: hmColor(yp), color: hmText(yp) }}
+            data-tooltip={`${y} (compounded): ${yp >= 0 ? '+' : '−'}${formatMonthlyReturn(Math.abs(yp))}` + (yrClickable ? ' · click for leg breakdown' : '')}
+            onClick={yrClickable ? fireYear : undefined}>
+            {(yp >= 0 ? '+' : '−') + formatMonthlyReturn(Math.abs(yp))}
+          </div>
+        )
         return cells
       })}
     </div>
@@ -522,7 +519,7 @@ function nearestPointTip(event, pts, width, height, overlayPts = []) {
       }
     })
   }
-  return { index, backtestIndex, xPct: p.x / width * 100, yPct: p.y / height * 100 }
+  return { index, backtestIndex, xPct: p.x / width * 100, yPct: p.y / height * 100, clientX: event.clientX, clientY: event.clientY }
 }
 
 function UnderwaterChart({ data }) {
@@ -560,10 +557,10 @@ function UnderwaterChart({ data }) {
           />
         </svg>
         {tip && active && (
-          <div className="qa-tip" style={{ left: `${tip.xPct}%`, top: `${tip.yPct}%` }}>
+          <FloatingTooltip x={tip.clientX} y={tip.clientY} className="chart-tooltip">
             <span>{monthShort(active.month)}</span>
             <b>Drawdown {active.drawdown_pct.toFixed(2)}%</b>
-          </div>
+          </FloatingTooltip>
         )}
       </div>
       <div className="qa-foot"><span>0%</span><b className="d">Worst -{worst}%</b></div>
@@ -608,10 +605,10 @@ function RollingSharpeChart({ data }) {
           />
         </svg>
         {tip && active && (
-          <div className="qa-tip" style={{ left: `${tip.xPct}%`, top: `${tip.yPct}%` }}>
+          <FloatingTooltip x={tip.clientX} y={tip.clientY} className="chart-tooltip">
             <span>{monthShort(active.month)}</span>
             <b>Sharpe {active.sharpe.toFixed(2)}</b>
-          </div>
+          </FloatingTooltip>
         )}
       </div>
       <div className="qa-foot"><span>{data[0].month.slice(0, 7)}</span><b>{data[data.length - 1].sharpe.toFixed(2)}</b></div>
@@ -638,15 +635,31 @@ function WorstDrawdownsPanel({ rows, series }) {
   const active = tip ? data[tip.index] : null
   const activePeriod = active ? periods.find(period => active.month >= period.started && active.month <= period.endMonth) : null
 
+  // Adaptive month/year x-axis (same helper as the Net PnL popup) + a full grid — horizontal
+  // (value) and vertical (time, aligned to the x-axis ticks).
+  const dataMonthMs = data.map(p => dateMs(p.month))
+  const tl = adaptiveTicks({ start: dataMonthMs[0], end: dataMonthMs[dataMonthMs.length - 1] }, dataMonthMs)
+  const tickX = tickMs => {
+    let idx = 0, best = Infinity
+    dataMonthMs.forEach((ms, i) => { const g = Math.abs(ms - tickMs); if (g < best) { best = g; idx = i } })
+    return xForIndex(idx)
+  }
+  const ySpan = (max - min) || 1
+  const yTicks = Array.from({ length: 5 }, (_, i) => {
+    const disp = min + ySpan * i / 4
+    return { y: chartPoint(0, 1, disp, min, max, W, H, pad).y, label: fCr(disp / 1e7) }
+  })
+
   return (
     <div className="dd-period-panel">
       <div className="dd-period-chart">
         <svg className="qa-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-          <g stroke="#E8E2D8" strokeWidth="1">
-            <line x1="0" y1={pad} x2={W} y2={pad} />
-            <line x1="0" y1={H / 2} x2={W} y2={H / 2} />
-            <line x1="0" y1={H - pad} x2={W} y2={H - pad} />
-          </g>
+          {yTicks.map((t, i) => <g key={'y' + i}>
+            <line x1={pad} y1={t.y} x2={W - pad} y2={t.y} stroke="#E8E2D8" strokeWidth="1" />
+            <text x={W - pad} y={t.y - 3} fontSize="10" textAnchor="end" fill="#9C9384" fontFamily="'JetBrains Mono',monospace"
+              stroke="#fff" strokeWidth="3" style={{ paintOrder: 'stroke' }}>{t.label}</text>
+          </g>)}
+          {tl.map(t => <line key={'x' + t.key} x1={tickX(t.key)} y1={pad} x2={tickX(t.key)} y2={H - pad} stroke="#E8E2D8" strokeWidth="1" />)}
           <line x1="0" y1={zeroY} x2={W} y2={zeroY} stroke="#1F1B16" strokeWidth="1.2" strokeDasharray="5 4" opacity=".55" />
           {periods.map(period => {
             const startIdx = monthIndex(period.started)
@@ -655,9 +668,8 @@ function WorstDrawdownsPanel({ rows, series }) {
             const width = Math.max(6, xForIndex(Math.max(endIdx, startIdx)) - x)
             return (
               <rect key={`${period.started}-${period.trough}`} x={x.toFixed(1)} y={pad} width={width.toFixed(1)} height={H - pad * 2}
-                fill="#FCA5A5" opacity=".28">
-                <title>{`${drawdownDate(period.started)} to ${drawdownDate(period.recovered)} · ${period.drawdown_pct.toFixed(2)}% · ${period.days} days`}</title>
-              </rect>
+                fill="#FCA5A5" opacity=".28"
+                data-tooltip={`${drawdownDate(period.started)} to ${drawdownDate(period.recovered)} · ${period.drawdown_pct.toFixed(2)}% · ${period.days} days`} />
             )
           })}
           <path d={line} fill="none" stroke="#0EA5E9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -678,13 +690,16 @@ function WorstDrawdownsPanel({ rows, series }) {
           />
         </svg>
         {tip && active && (
-          <div className="qa-tip" style={{ left: `${tip.xPct}%`, top: `${tip.yPct}%` }}>
+          <FloatingTooltip x={tip.clientX} y={tip.clientY} className="chart-tooltip">
             <span>{monthShort(active.month)}</span>
             <b>{fCr((active.cumulative_inr || 0) / 1e7)}</b>
             {activePeriod && <em>DD {activePeriod.drawdown_pct.toFixed(2)}% · {activePeriod.days} days</em>}
-          </div>
+          </FloatingTooltip>
         )}
         <div className="dd-axis"><span>{fCr(min / 1e7)}</span><b>{fCr(max / 1e7)}</b></div>
+      </div>
+      <div className="equity-timeline" aria-label="Drawdown chart timeline">
+        {tl.map(t => <span className="timeline-tick" key={t.key} style={{ left: `${t.xPct}%` }}>{t.label}</span>)}
       </div>
       <div className="dd-period-legend">
         <span><i style={{ background: '#0EA5E9' }}></i>Cumulative Net PnL</span>
@@ -692,13 +707,14 @@ function WorstDrawdownsPanel({ rows, series }) {
       </div>
       <div className="tscroll qa-table">
         <table>
-          <thead><tr><th>Started</th><th>Trough</th><th>Recovered</th><th className="num">Drawdown</th><th className="num">Days</th></tr></thead>
+          <thead><tr><th>Started</th><th>Trough</th><th>Recovered</th><th className="num">Recovery Days</th><th className="num">Drawdown</th><th className="num">Days</th></tr></thead>
           <tbody>
             {rows.map(row => (
               <tr key={`${row.started}-${row.trough}`}>
                 <td>{drawdownDate(row.started)}</td>
                 <td>{drawdownDate(row.trough)}</td>
                 <td>{drawdownDate(row.recovered)}</td>
+                <td className="num m">{row.recovered ? daysBetween(row.trough, row.recovered) : '—'}</td>
                 <td className="num m d">{row.drawdown_pct.toFixed(2)}%</td>
                 <td className="num m">{row.days}</td>
               </tr>
@@ -756,7 +772,7 @@ function ReturnQuantilesChart({ rows }) {
                 height={H}
                 onMouseMove={event => {
                   const rect = event.currentTarget.getBoundingClientRect()
-                  setTip({ row, xPct: (x / W) * 100, yPct: ((event.clientY - rect.top) / rect.height) * 100 })
+                  setTip({ row, xPct: (x / W) * 100, yPct: ((event.clientY - rect.top) / rect.height) * 100, clientX: event.clientX, clientY: event.clientY })
                 }}
                 onMouseLeave={() => setTip(null)}
               />
@@ -765,12 +781,12 @@ function ReturnQuantilesChart({ rows }) {
           )})}
         </svg>
       {tip && (
-        <div className="qa-tip" style={{ left: `${tip.xPct}%`, top: `${tip.yPct}%` }}>
+        <FloatingTooltip x={tip.clientX} y={tip.clientY} className="chart-tooltip">
           <span>{tip.row.label}</span>
           <b>Median {tip.row.median.toFixed(2)}%</b>
           <em>Q1 {tip.row.q1.toFixed(2)}% · Q3 {tip.row.q3.toFixed(2)}%</em>
           <em>Range {tip.row.min.toFixed(2)}% to {tip.row.max.toFixed(2)}%</em>
-        </div>
+        </FloatingTooltip>
       )}
       </div>
   )
@@ -782,7 +798,6 @@ function drawdownDate(s) {
 }
 
 function RiskMetricMatrix({ metrics }) {
-  const [tip, setTip] = useState(null)
   const rows = [
     { label: 'Sortino', value: metrics.sortino.toFixed(2), tip: 'Like Sharpe, but it only punishes bad monthly moves. Higher means returns were better compared with downside risk.' },
     { label: 'Calmar', value: metrics.calmar.toFixed(2), tip: 'Compares annual growth with the worst capital drawdown. Higher means growth was strong relative to the deepest fall.' },
@@ -802,40 +817,17 @@ function RiskMetricMatrix({ metrics }) {
     { label: 'Skew', value: metrics.skew.toFixed(2), tip: 'Shows whether returns lean toward big upside or big downside. Positive is upside-leaning, negative is downside-leaning.' },
     { label: 'Kurtosis', value: metrics.kurtosis.toFixed(2), tip: 'Shows how fat the tails are. Higher means more unusual large moves compared with a normal return pattern.' },
   ]
-  function showTip(event, text) {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const width = 286
-    const left = Math.min(Math.max(12, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 12)
-    const placeAbove = rect.bottom + 96 > window.innerHeight && rect.top > 120
-    setTip({
-      text,
-      left,
-      top: placeAbove ? rect.top - 6 : rect.bottom + 6,
-      placeAbove,
-    })
-  }
   return (
-    <>
       <div className="risk-matrix">
         {rows.map(row => (
           <div className="risk-cell" key={row.label}>
             <span>{row.label}
               <button className="risk-help" type="button" aria-label={`${row.label} explanation`}
-                onMouseEnter={event => showTip(event, row.tip)}
-                onFocus={event => showTip(event, row.tip)}
-                onMouseLeave={() => setTip(null)}
-                onBlur={() => setTip(null)}>?</button>
+                data-tooltip={row.tip}>i</button>
             </span>
             <b>{row.value}</b>
           </div>
         ))}
       </div>
-      {tip && createPortal(
-        <div className={'risk-help-tip ' + (tip.placeAbove ? 'above' : '')} style={{ left: tip.left, top: tip.top }}>
-          {tip.text}
-        </div>,
-        document.body,
-      )}
-    </>
   )
 }

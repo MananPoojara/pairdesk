@@ -151,27 +151,37 @@ async function doFetch() {
   const fut = await resolveFutTokens()
   const tokenKey = {}                                          // scrip token -> nifty|midcap|banknifty
   for (const key of ['nifty', 'midcap', 'banknifty']) tokenKey[fut[key].token] = key
+  // NSE index SPOT tokens (stable — don't change with expiry). Fetched alongside the futures so the
+  // ticker bar can show spot while the rest of the app keeps using the futures LTP.
+  const spotKey = { '99926000': 'nifty', '99926074': 'midcap', '99926009': 'banknifty' }
   const q = await fetch(`${base}/rest/secure/angelbroking/market/v1/quote/`, {
     method: 'POST', headers: { ...hdr(e), Authorization: `Bearer ${_jwt}` },
-    body: JSON.stringify({ mode: 'FULL', exchangeTokens: { NFO: Object.keys(tokenKey) } }),
+    body: JSON.stringify({ mode: 'FULL', exchangeTokens: { NFO: Object.keys(tokenKey), NSE: Object.keys(spotKey) } }),
     signal: AbortSignal.timeout(15000),
   })
   const j = await q.json()
   const fetched = j?.data?.fetched
   if (!fetched?.length) throw new Error(`quote failed: ${j?.message} / ${j?.errorcode}`)
+  const r2 = x => Math.round((+x || 0) * 100) / 100
   const now = new Date()
   const out = { updated: `${now.toISOString().slice(0, 10)} ${now.toTimeString().slice(0, 5)}` }
+  const spots = {}
+  for (const it of fetched) {
+    const sk = spotKey[String(it.symbolToken)]
+    if (sk) spots[sk] = { ltp: r2(it.ltp), change: r2(it.netChange), pct: r2(it.percentChange) }
+  }
   for (const it of fetched) {
     const k = tokenKey[String(it.symbolToken)]
     if (k) out[k] = {
-      ltp: Math.round((+it.ltp || 0) * 100) / 100,
-      change: Math.round((+it.netChange || 0) * 100) / 100,
-      pct: Math.round((+it.percentChange || 0) * 100) / 100,
-      prev_close: Math.round(((+it.close) || (+it.ltp - +it.netChange) || 0) * 100) / 100,
+      ltp: r2(it.ltp),
+      change: r2(it.netChange),
+      pct: r2(it.percentChange),
+      prev_close: r2((+it.close) || (+it.ltp - +it.netChange) || 0),
       oi: +it.opnInterest || 0,                                // open interest (futures-only)
       contract: fut[k].symbol,                                 // e.g. NIFTY28JUL26FUT
       expiry: fut[k].expiry,
       date: (it.exchFeedTime || '').slice(0, 11).trim(),
+      spot: spots[k] || null,                                  // NSE index spot (for the ticker bar)
     }
   }
   _quote = out; _quoteAt = Date.now()

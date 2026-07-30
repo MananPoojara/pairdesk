@@ -1,5 +1,7 @@
 import { query } from '../db/pg.js'
 import { pairReferenceStats } from '../data/spotBacktest.js'
+import { getLiveMarket } from '../data/liveMarket.js'
+import { openCycleMonth, applyOpenCycleToMonthly } from '../data/openCycle.js'
 
 // 1 Cr = 1e7 INR = 1e9 paise
 function sharpe(nets, aumInr) {
@@ -60,6 +62,24 @@ export async function strategiesHandler(req, reply) {
            SUM(gross_inr - charges_inr) OVER (ORDER BY month) AS cumulative_inr
     FROM m
   `)
+
+  // Live-mark the open cycle (most-recent-expiry pair). Its Excel exit is a projected close; while
+  // held, override that month with the live MTM (entry-side charges only) so every stat below follows.
+  // `?frozen=1` (used by the Backtest page, which wants the pure historical/backtest number, never
+  // live LTP) skips this override — every other caller (Dashboard, Strategies) is unaffected.
+  const frozen = req.query?.frozen === '1' || req.query?.frozen === 'true'
+  if (!frozen) {
+    const live = await getLiveMarket().catch(() => null)
+    const liveLtp = { NIFTY: live?.nifty?.ltp, MIDCPNIFTY: live?.midcap?.ltp }
+    const { rows: latestExpiry } = await query(`SELECT MAX(expiry)::text AS expiry FROM trades`)
+    const maxExpiry = latestExpiry[0].expiry
+    const { rows: positions } = await query(`
+      SELECT t.underlying, t.direction, t.lots, t.lot_size,
+             t.entry_price::float AS entry_price, t.exit_price::float AS exit_price
+      FROM trades t WHERE t.expiry = $1
+    `, [maxExpiry])
+    applyOpenCycleToMonthly(monthly, maxExpiry.slice(0, 8) + '01', openCycleMonth(positions, u => liveLtp[u]))
+  }
 
   const nets = monthly.map(m => +m.net_inr)
   const cum = monthly.map(m => +m.cumulative_inr)

@@ -27,16 +27,10 @@ export function buildCurvePath(monthly, W, H, pad = 6) {
 
 // Monthly heatmap colour + text, ported from R4's hmColor/hmText.
 export function hmColor(pct) {
-  if (pct === null) return '#F0E7D9'
-  if (pct > 0.5) return '#0369A1'
-  if (pct > 0.2) return '#0EA5E9'
-  if (pct > 0.05) return '#38BDF8'
-  if (pct > 0) return '#7DD3FC'
-  if (pct > -0.05) return '#FED7AA'
-  if (pct > -0.2) return '#FB923C'
-  return '#C2410C'
+  if (pct === null || pct === undefined) return '#F0E7D9'
+  return pct >= 0 ? '#7DD3FC' : '#FDBA74'   // flat lighter: positive = light blue, negative = light orange
 }
 export function hmText(pct) {
-  if (pct === null) return '#C9BBA6'
-  return pct > -0.05 && pct <= 0.2 ? '#0B2A45' : '#fff'
+  if (pct === null || pct === undefined) return '#C9BBA6'
+  return '#000000'
 }
