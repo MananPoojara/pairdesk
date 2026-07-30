@@ -101,6 +101,19 @@ export default function AppShell({ children }) {
     }
   }, [entryPhase])
 
+  // Fit the fixed-width (~1372px) dashboard to the viewport on EVERY size, incl. > 1920px monitors,
+  // and keep it in sync on resize. Previously the zoom was set once on login-exit and capped at
+  // 1.25 (froze at ~1715px wide), so large screens rendered the whole UI small. Zoom scales the
+  // layout AND fonts together; the tooltip derives its own factor, so nothing else needs changes.
+  useLayoutEffect(() => {
+    const applyZoom = () => {
+      document.body.style.zoom = String(Math.min(1.9, document.documentElement.clientWidth / 1372))
+    }
+    applyZoom()
+    window.addEventListener('resize', applyZoom)
+    return () => window.removeEventListener('resize', applyZoom)
+  }, [])
+
   function handleLogout() {
     const page = document.documentElement
     page.classList.remove('pairdesk-entry-closing', 'pairdesk-entry-covered', 'pairdesk-entry-revealing')

@@ -141,7 +141,7 @@ export default function Login() {
     window.addEventListener('resize', holdLoginZoom)
     return () => {
       window.removeEventListener('resize', holdLoginZoom)
-      document.body.style.zoom = Math.min(1.25, document.documentElement.clientWidth / 1372)
+      document.body.style.zoom = Math.min(1.9, document.documentElement.clientWidth / 1372)
     }
   }, [])
 

@@ -78,6 +78,14 @@ trades.columns = ["date","symbol","expiry","direction","qty",
                   "entry","exit","net_profit_xl","total_exp_xl","gross_xl",
                   "stt_xl","exch_xl","sebi_xl","stamp_xl","gst_xl"]
 
+# Split off OPEN rows (blank Exit Price = the current running pair, not yet closed). Closed rows
+# go through the usual reconcile + charge pipeline below; open rows are inserted later with
+# exit_price NULL and NO charge rows — so realized/monthly (which INNER JOIN trade_charges) skip
+# them, while the positions panel (MAX(expiry), no charge join) picks them up and marks them to
+# the live Angel One LTP for unrealised P&L.
+open_trades = trades[trades["exit"].isna()].copy()
+trades      = trades[trades["exit"].notna()].copy()
+
 def _num(x):
     return float(x) if pd.notna(x) else 0.0
 
@@ -260,6 +268,30 @@ for tr in rows_out:
         ))
         tid = cur.fetchone()[0]
         trade_ids_by_client[cid].append((tid, tr))
+
+# Insert OPEN positions (current running pair, no exit yet): exit_price NULL, no charge rows.
+for _, r in open_trades.iterrows():
+    sym  = r["symbol"]; qty = int(r["qty"]); dirn = r["direction"]
+    lot_size = LOT_SIZE.get(sym) or (50 if sym == "MIDCPNIFTY" else 25)
+    if qty % lot_size != 0:               # guarantee lots × lot_size == qty (correct unrealised)
+        lot_size, lots = 1, qty
+    else:
+        lots = qty // lot_size
+    regime = "BULL" if (sym == "MIDCPNIFTY" and dirn == "LONG") or \
+                       (sym == "NIFTY" and dirn == "SHORT") else "BEAR"
+    leg    = "BULL" if sym == "MIDCPNIFTY" else "BEAR"
+    contract_expiry = f"{sym}{r['expiry'].strftime('%y%b').upper()}FUT"
+    cur.execute("""
+        INSERT INTO trades
+          (client_id, strategy_id, trade_date, underlying, contract, expiry,
+           direction, lots, lot_size, entry_price, exit_price,
+           entry_time, exit_time, leg, regime, is_rollover, source)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, NULL,
+                %s::date, NULL, %s,%s, FALSE,'backtest')
+    """, (client_id, strategy_id, r["date"], sym, contract_expiry, r["expiry"],
+          dirn, lots, lot_size, float(r["entry"]), r["date"], leg, regime))
+if len(open_trades):
+    print(f"  Inserted {len(open_trades)} OPEN position row(s) (exit NULL, marked to live LTP)")
 
 # Insert charges (full amounts — single client, no split)
 for cid, trade_list in trade_ids_by_client.items():
