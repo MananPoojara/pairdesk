@@ -479,3 +479,12 @@ html.pairdesk-entry-revealing::after{
   .eq-modal-head{flex-wrap:wrap;gap:8px}
   .modal{width:96vw}
 }
+
+/* Returns heatmap: one font family for labels + values; dividers before YEAR and above the Avg row */
+.hm,.hm .cell,.hmx span{font-family:var(--font-table)}
+.hm .cell.yr,.hmx span.yr{position:relative;margin-left:10px}
+.hm .cell.yr::before,.hmx span.yr::before{content:'';position:absolute;left:-7px;top:-3px;bottom:-3px;border-left:2px solid var(--text)}
+.hm .avg,.hm .cell.avg:hover{position:relative;transform:translateY(7px)}
+.hm .avg::after{content:'';position:absolute;left:-3px;right:-3px;top:-6px;border-top:2px solid var(--text)}
+.hm .cell.yr.avg::before{top:-11px}
+.hm .yl.avg::after{right:-4px}

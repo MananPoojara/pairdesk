@@ -574,7 +574,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="hmx hmx-top" style={{ gridTemplateColumns: `26px repeat(${heatMode === 'quarter' ? 5 : 13},1fr)` }}>
-              <span></span>{(heatMode === 'quarter' ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']).map((m, i) => <span key={i}>{m}</span>)}<span>YEAR</span>
+              <span></span>{(heatMode === 'quarter' ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']).map((m, i) => <span key={i}>{m}</span>)}<span className="yr">YEAR</span>
             </div>
             <Heatmap monthly={curveMonthly} compact={heatYears >= 5} mode={heatMode} onCellClick={setMonthModal} />
           </div>
@@ -1202,6 +1202,20 @@ function Heatmap({ monthly, compact, mode = 'month', onCellClick }) {
   const dataYears = [...new Set((monthly || []).map(m => String(m.month).slice(0, 4)))].sort()
   const years = dataYears.length ? dataYears : ['2024', '2025', '2026']
   const n = quarter ? 4 : 12
+  const sgn = v => (v >= 0 ? '+' : '−') + formatMonthlyReturn(Math.abs(v))
+  const mean = a => a.length ? a.reduce((x, v) => x + v, 0) / a.length : null
+  const yearPcts = years.map(y => monthly.filter(m => String(m.month).slice(0, 4) === y))
+    .filter(r => r.length).map(r => compoundYearlyPct(r.map(m => m.pct)))
+  // Avg row: per-column mean across years with data; the YEAR cell is the mean yearly return.
+  const avgRow = [<div key="avg-l" className="yl avg">Avg</div>]
+  for (let i = 1; i <= n; i++) {
+    const v = mean(years.map(y => map[`${y}-${i}`]).filter(x => x != null))
+    avgRow.push(<div key={'avg-' + i} className="cell avg" style={{ background: hmColor(v), color: hmText(v) }}
+      data-tooltip={v == null ? 'No data' : `Average ${quarter ? 'Q' + i : 'month'}: ${sgn(v)}`}>{v == null ? '' : sgn(v)}</div>)
+  }
+  const ya = mean(yearPcts)
+  avgRow.push(<div key="avg-yr" className="cell yr avg" style={{ background: hmColor(ya), color: hmText(ya) }}
+    data-tooltip={ya == null ? 'No data' : `Average year: ${sgn(ya)}`}>{ya == null ? '' : sgn(ya)}</div>)
   return (
     <div className={'hm' + (quarter ? ' hm-q' : '') + (compact ? ' hm-compact' : '')}
       style={{ gridTemplateColumns: `26px repeat(${n + 1},1fr)` }}>
@@ -1243,6 +1257,7 @@ function Heatmap({ monthly, compact, mode = 'month', onCellClick }) {
         )
         return cells
       })}
+      {avgRow}
     </div>
   )
 }

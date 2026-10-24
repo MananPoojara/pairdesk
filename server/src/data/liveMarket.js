@@ -75,7 +75,7 @@ function hdr(e) {
     'X-ClientLocalIP': e.LOCAL_IP || '127.0.0.1',
     'X-ClientPublicIP': e.PUBLIC_IP || '127.0.0.1',
     'X-MACAddress': e.MAC_ADDRESS || '00:00:00:00:00:00',
-    'X-PrivateKey': e.ANGEL_ONE_API_KEY_NEW || e.ANGEL_ONE_API_KEY_OLD,
+    'X-PrivateKey': e.ANGEL_ONE_API_KEY_NEW || e.ANGEL_ONE_API_KEY_OLD || e.ANGEL_ONE_API_KEY,
   }
 }
 
